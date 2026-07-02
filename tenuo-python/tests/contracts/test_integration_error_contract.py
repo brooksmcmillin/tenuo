@@ -332,7 +332,7 @@ def test_mcp_client_raise_for_denial_matches_contract(row: ErrorTypeContract) ->
 
 @pytest.mark.parametrize("row", _integration_rows("autogen"), ids=_row_ids)
 def test_autogen_authorize_matches_contract(row: ErrorTypeContract) -> None:
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
 
     from tenuo import SigningKey, Warrant
     from tenuo.autogen import GuardBuilder
