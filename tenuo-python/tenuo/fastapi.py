@@ -497,8 +497,14 @@ class TenuoGuard:
 
                 raw_list = json.loads(base64.b64decode(x_tenuo_approvals))
                 decoded_approvals = [SignedApproval.from_bytes(base64.b64decode(item)) for item in raw_list]
-            except Exception:
-                logger.warning("Failed to decode X-Tenuo-Approvals header", exc_info=True)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error": "invalid_approval",
+                        "message": f"Invalid X-Tenuo-Approvals header: {exc}",
+                    },
+                ) from exc
 
         # 5. Authorize using Adapter (include delegation chain parents if present)
         parents = getattr(request.state, "tenuo_parents", [])

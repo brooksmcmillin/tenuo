@@ -966,7 +966,7 @@ class TenuoActivityInboundInterceptor:
                     ) from _e
 
             # -- 11. Multi-Sig Approval Resolution --
-            gate_approvals = self._resolve_approval_gate_approvals(
+            gate_approvals = await self._resolve_approval_gate_approvals(
                 warrant, tool_name, args, headers,
             )
 
@@ -1129,7 +1129,7 @@ class TenuoActivityInboundInterceptor:
 
         return await self._next.execute_activity(input)
 
-    def _resolve_approval_gate_approvals(
+    async def _resolve_approval_gate_approvals(
         self,
         warrant: Any,
         tool_name: str,
@@ -1152,51 +1152,39 @@ class TenuoActivityInboundInterceptor:
                     CoreSignedApproval.from_bytes(base64.b64decode(a))
                     for a in approvals_list
                 ]
-            except Exception as e:
-                logger.warning(f"Failed to decode approvals header: {e}")
+            except Exception as exc:
+                raise InvalidApproval(
+                    f"Malformed x-tenuo-approvals header: {exc}",
+                ) from exc
 
         handler = self._config.approval_handler if self._config else None
         if handler is not None:
-            try:
-                from tenuo_core import py_compute_request_hash as _compute_hash
-                from tenuo.approval import ApprovalRequest
+            from tenuo_core import py_compute_request_hash as _compute_hash
+            from tenuo.approval import ApprovalRequest
 
-                holder_key = getattr(warrant, "holder_key", None)
-                warrant_id = getattr(warrant, "id", "") or ""
-                request_hash = _compute_hash(warrant_id, tool_name, args, holder_key)
-                request = ApprovalRequest.for_warrant_gate(
-                    tool_name,
-                    args,
-                    warrant,
-                    request_hash,
-                    holder_key=holder_key,
-                )
+            holder_key = getattr(warrant, "holder_key", None)
+            warrant_id = getattr(warrant, "id", "") or ""
+            request_hash = _compute_hash(warrant_id, tool_name, args, holder_key)
+            request = ApprovalRequest.for_warrant_gate(
+                tool_name,
+                args,
+                warrant,
+                request_hash,
+                holder_key=holder_key,
+            )
 
-                result = handler(request)
-                if _inspect.isawaitable(result):
-                    import asyncio
-                    from typing import cast, Coroutine as _Coro
-                    coro = cast(_Coro[Any, Any, Any], result)
-                    try:
-                        loop = asyncio.get_running_loop()
-                    except RuntimeError:
-                        loop = None
-                    if loop and loop.is_running():
-                        future = asyncio.run_coroutine_threadsafe(coro, loop)
-                        result = future.result(timeout=300)
-                    else:
-                        result = asyncio.run(coro)
+            result = handler(request)
+            if _inspect.isawaitable(result):
+                result = await result
 
-                collected = result if isinstance(result, list) else [result]
+            collected = result if isinstance(result, list) else [result]
 
-                approvers = warrant.required_approvers()
-                threshold = warrant.approval_threshold()
-                from tenuo_core import verify_approvals as _verify
-                _verify(request_hash, collected, approvers, threshold)
+            approvers = warrant.required_approvers()
+            threshold = warrant.approval_threshold()
+            from tenuo_core import verify_approvals as _verify
+            _verify(request_hash, collected, approvers, threshold)
 
-                return collected
-            except Exception:
-                raise
+            return collected
 
         raise ApprovalGateTriggered(
             tool=tool_name,

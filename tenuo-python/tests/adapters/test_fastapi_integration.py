@@ -27,6 +27,7 @@ try:
 
     from tenuo.fastapi import (  # type: ignore[no-redef]
         FASTAPI_AVAILABLE,
+        X_TENUO_APPROVALS,
         X_TENUO_POP,
         X_TENUO_WARRANT,
         SecurityContext,
@@ -87,6 +88,27 @@ class TestFastAPIIntegration:
         resp = client.get("/search?query=test", headers=headers)
         assert resp.status_code == 200
         assert resp.json()["query"] == "test"
+
+    def test_malformed_approvals_header_returns_400(self, app, client, key):
+        """Malformed X-Tenuo-Approvals must fail closed with 400, not be ignored."""
+        @app.get("/search")
+        def search(ctx: SecurityContext = Depends(TenuoGuard("search"))):
+            return {"status": "ok"}
+
+        warrant = Warrant.mint_builder().tool("search").mint(key)
+        args = {"query": "test"}
+        pop_sig = warrant.sign(key, "search", args, int(time.time()))
+        pop_b64 = base64.b64encode(pop_sig).decode("ascii")
+        bad_approvals = base64.b64encode(b"not-json").decode("ascii")
+
+        headers = {
+            X_TENUO_WARRANT: warrant.to_base64(),
+            X_TENUO_POP: pop_b64,
+            X_TENUO_APPROVALS: bad_approvals,
+        }
+        resp = client.get("/search?query=test", headers=headers)
+        assert resp.status_code == 400
+        assert resp.json()["detail"]["error"] == "invalid_approval"
 
     def test_invalid_pop_signature_returns_403(self, app, client, key):
         @app.get("/search")

@@ -136,6 +136,8 @@ class A2AErrorCode:
             1600: cls.POP_FAILED,
             1700: cls.INSUFFICIENT_APPROVALS,
             1701: cls.INVALID_APPROVAL,
+            # A2A has no dedicated ApproverNotAuthorized JSON-RPC code; 1702
+            # (wire APPROVER_NOT_AUTHORIZED) maps to INVALID_APPROVAL (-32021).
             1702: cls.INVALID_APPROVAL,
             1707: cls.APPROVAL_REQUIRED,
             1800: cls.REVOKED,

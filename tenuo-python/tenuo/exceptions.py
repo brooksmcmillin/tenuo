@@ -1227,7 +1227,7 @@ class InsufficientApprovals(ApprovalError):
     def __init__(self, required: int, received: int, detail: str = "", hint: Optional[str] = None):
         msg = f"Insufficient approvals: required {required}, received {received}"
         if detail:
-            msg = f"{msg}{detail}"
+            msg = f"{msg}: {detail}"
         super().__init__(msg, hint=hint)
         self.details = {"required": required, "received": received, "detail": detail}
 

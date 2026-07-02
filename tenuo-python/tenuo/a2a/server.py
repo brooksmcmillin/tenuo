@@ -1840,9 +1840,8 @@ class A2AServer:
 
             raw_list = json.loads(_b64.b64decode(raw))
             return [SignedApproval.from_bytes(_b64.b64decode(item)) for item in raw_list]
-        except Exception:
-            logger.warning("Failed to decode %s", APPROVALS_HEADER, exc_info=True)
-            return None
+        except Exception as exc:
+            raise InvalidApprovalError(str(exc)) from exc
 
     # -------------------------------------------------------------------------
     # Audit Logging
