@@ -48,8 +48,8 @@ class ProtectedToolWrapper:
 
             # CRYPTOGRAPHIC AUTHORIZATION using Proof-of-Possession
             # warrant.validate() internally:
-            # 1. Signs: pop_sig = warrant.sign(key, tool, args)
-            # 2. Verifies: warrant.authorize(tool, args, pop_sig)
+            # 1. Signs a PoP: pop_sig = warrant.sign(key, tool, args)
+            # 2. Verifies the warrant chain, PoP, and constraints
             result = self.warrant.validate(self.signing_key, tool_name, kwargs)
 
             if not result:

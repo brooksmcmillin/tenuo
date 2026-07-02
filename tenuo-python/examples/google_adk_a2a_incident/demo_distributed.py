@@ -283,7 +283,7 @@ class DistributedDemo:
                     data = result.get("data", {})
                     info(f"IP 203.0.113.5: {data.get('category', 'unknown')}", 4)
                     info(f"Threat score: {data.get('score', 'N/A')}/100", 4)
-                    info(f"Warrant JTI: {result.get('warrant_jti', 'N/A')[:12]}...", 4)
+                    info(f"Warrant ID: {result.get('warrant_id', 'N/A')[:12]}...", 4)
                 else:
                     info(f"Result: {result}", 4)
 

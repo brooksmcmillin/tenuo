@@ -463,7 +463,7 @@ Tenuo sends warrant metadata via `params._meta.tenuo`:
 }
 ```
 
-The `warrant` field accepts either a single base64-encoded warrant (for root warrants issued directly by a trusted root) or a **WarrantStack** — the full delegation chain encoded as a CBOR array. See [Multi-Agent Delegation](#multi-agent-delegation) below.
+The `warrant` field accepts either a single base64-encoded warrant (for root warrants issued directly by a trusted root) or a **WarrantStack** — the full delegation chain encoded as a CBOR array. See [Multi-Agent Delegation](#advanced-multi-agent-delegation) below.
 
 ---
 
@@ -547,7 +547,7 @@ except TenuoError as e:
 | `ConfigurationError` | 1201 | Not connected / extraction failed | Use `async with` or check config |
 | `ExpiredError` | 1300 | TTL exceeded | Request fresh warrant |
 
-See [wire format specification](./spec/wire-format-v1#appendix-a-error-codes) for the complete list.
+See [wire format specification](./spec/wire-format-v1#appendix-a-error-code-reference) for the complete list.
 
 ---
 
@@ -816,7 +816,7 @@ http_request:
 
 ## See Also
 
-- [API Reference → MCP Integration](./api-reference#mcp)
+- [API Reference → MCP Integration](./api-reference#mcp-integration)
 - [Argument Extraction](./constraints#argument-extraction)
 - [Constraints Guide](./constraints)
 - [Security Best Practices](./security)

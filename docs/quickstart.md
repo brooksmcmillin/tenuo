@@ -42,6 +42,9 @@ uv pip install "tenuo[mcp]"         # MCP (Python ≥3.10)
 uv pip install "tenuo[a2a]"         # A2A inter-agent delegation
 uv pip install "tenuo[fastapi]"     # FastAPI
 uv pip install "tenuo[autogen]"     # AutoGen AgentChat (Python ≥3.10)
+uv pip install "tenuo[fastmcp]"     # FastMCP (TenuoMiddleware / FastMCP servers)
+uv pip install "tenuo[langgraph]"   # LangGraph (includes LangChain)
+uv pip install "tenuo[cloud]"       # Tenuo Cloud SDK (proprietary control-plane client)
 ```
 
 ## Try It (Copy-Paste, Runs Immediately)

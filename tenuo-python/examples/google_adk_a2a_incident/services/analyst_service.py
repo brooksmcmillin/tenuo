@@ -6,12 +6,13 @@ Runs as a separate process, exposing threat intelligence tools via A2A protocol.
 Receives delegated warrant from orchestrator, validates it, and provides
 access to query_threat_db capability.
 
-Security: Uses warrant.authorize() for Tier 2 (PoP) validation.
+Security: Uses Authorizer.authorize() for Tier 2 (PoP) validation.
 """
 
 import argparse
 import asyncio
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -22,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 # Import tools
 from tools import query_threat_db
 
-from tenuo import SigningKey, Warrant
+from tenuo import Authorizer, SigningKey, Warrant
 from tenuo.exceptions import AuthorizationError, ConstraintViolation
 
 
@@ -111,7 +112,7 @@ class AnalystService:
         """
         Handle threat DB query request.
 
-        Uses warrant.authorize() for Tier 2 validation with PoP.
+        Uses Authorizer.authorize() for Tier 2 validation with PoP.
         """
         query = params.get("query")
         table = params.get("table")
@@ -119,20 +120,24 @@ class AnalystService:
         if not query or not table:
             raise ValueError("Missing required parameters: query, table")
 
-        # TIER 2 AUTHORIZATION: Use warrant.authorize() with PoP signature
+        # TIER 2 AUTHORIZATION: Use Authorizer.authorize() with a PoP signature.
         # This validates:
         # 1. Warrant grants the skill
         # 2. Arguments satisfy constraints
         # 3. Warrant is not expired
-        # 4. Signature chain is valid
+        # 4. Signature chain is valid (PoP + trusted root)
         try:
-            pop_signature = self.signing_key.sign(
-                f"query_threat_db:{query}:{table}".encode()
+            args = {"query": query, "table": table}
+            # Proof-of-Possession: sign the exact (tool, args) with the holder key.
+            pop_signature = self.warrant.sign(
+                self.signing_key, "query_threat_db", args, int(time.time())
             )
-            self.warrant.authorize(
-                tool="query_threat_db",
-                args={"query": query, "table": table},
-                signature=pop_signature,
+            # In production, configure the Authorizer with your control plane's
+            # root public key. For this single-delegation demo the warrant's
+            # issuer is the trusted root.
+            authorizer = Authorizer(trusted_roots=[self.warrant.issuer])
+            authorizer.authorize(
+                self.warrant, "query_threat_db", args, bytes(pop_signature)
             )
         except Exception as e:
             # Re-raise as AuthorizationError for consistent handling
@@ -142,14 +147,14 @@ class AnalystService:
         result = query_threat_db(query, table)
 
         # Get warrant ID for audit trail
-        jti = self.warrant.jti
-        jti_str = jti.hex() if hasattr(jti, 'hex') else str(jti)
+        warrant_id = self.warrant.id
+        warrant_id_str = warrant_id.hex() if hasattr(warrant_id, "hex") else str(warrant_id)
 
         return {
             "success": True,
             "data": result,
-            "warrant_jti": jti_str,
-            "authorized_by": "warrant.authorize()",  # Proof of Tier 2
+            "warrant_id": warrant_id_str,
+            "authorized_by": "Authorizer.authorize()",  # Proof of Tier 2
         }
 
     async def start(self):

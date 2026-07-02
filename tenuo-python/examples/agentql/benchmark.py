@@ -21,7 +21,7 @@ from typing import Dict
 
 from wrapper import TenuoAgentQLAgent
 
-from tenuo import Exact, OneOf, SigningKey, UrlPattern, Warrant, Wildcard
+from tenuo import Authorizer, Exact, OneOf, SigningKey, UrlPattern, Warrant, Wildcard
 
 
 class Benchmark:
@@ -473,23 +473,30 @@ def benchmark_pop_overhead():
     # Use bound warrant to get access to validate()
     bound = warrant.bind(agent_key)
 
+    # Authorizer trusts the minting (user) key; used for the server-side verify path.
+    authorizer = Authorizer(trusted_roots=[user_key.public_key])
+
+    # URL that satisfies the "https://*.example.com/*" constraint so the verify
+    # path exercises a successful authorization (Authorizer.authorize raises on denial).
+    nav_args = {"url": "https://app.example.com/page"}
+
     bench = Benchmark()
 
     # 1. Sign only
     print("\n5a. Signing only (Client side)...")
     results_sign = bench.measure_latency(
-        lambda: warrant.sign(agent_key, "navigate", {"url": "https://example.com"}, int(time.time())),
+        lambda: warrant.sign(agent_key, "navigate", nav_args, int(time.time())),
         iterations=1000
     )
     print(f"  Mean latency: {results_sign['mean']:.3f} ms")
 
     # 2. Verify only (Server side)
     # Generate a signature first to reuse
-    sig = warrant.sign(agent_key, "navigate", {"url": "https://example.com"}, int(time.time()))
+    sig = warrant.sign(agent_key, "navigate", nav_args, int(time.time()))
 
     print("\n5b. Verify only (Server side)...")
     results_verify = bench.measure_latency(
-        lambda: warrant.authorize("navigate", {"url": "https://example.com"}, sig),
+        lambda: authorizer.authorize(warrant, "navigate", nav_args, bytes(sig)),
         iterations=1000
     )
     print(f"  Mean latency: {results_verify['mean']:.3f} ms")
@@ -497,7 +504,7 @@ def benchmark_pop_overhead():
     # 3. Full Round Trip (bound.validate)
     print("\n5c. Full Round Trip (Sign + Verify)...")
     results_full = bench.measure_latency(
-        lambda: bound.validate("navigate", {"url": "https://example.com"}),
+        lambda: bound.validate("navigate", nav_args),
         iterations=1000
     )
     print(f"  Mean latency: {results_full['mean']:.3f} ms")

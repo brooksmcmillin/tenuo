@@ -80,7 +80,7 @@ guard = (GuardBuilder()
 
 ## Delegation Chains
 
-For multi-agent delegation with attenuated warrants, see [Delegation Chains](./concepts#delegation).
+For multi-agent delegation with attenuated warrants, see [Monotonic Attenuation](./concepts#monotonic-attenuation).
 
 Use `Warrant.grant_builder()` to create child warrants with narrower scope:
 

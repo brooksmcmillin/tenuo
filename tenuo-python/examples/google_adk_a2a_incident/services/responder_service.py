@@ -6,7 +6,7 @@ Runs as a separate process, exposing blocking/quarantine tools via A2A protocol.
 Receives attenuated warrant from analyst, validates it, and provides
 access to block_ip and quarantine_user capabilities.
 
-Security: Uses warrant.authorize() for Tier 2 (PoP) validation.
+Security: Uses Authorizer.authorize() for Tier 2 (PoP) validation.
 This is CRITICAL for the attenuated warrant - the IP constraint (Exact vs Cidr)
 must be checked at the wire level, not in Python if-statements.
 """
@@ -14,6 +14,7 @@ must be checked at the wire level, not in Python if-statements.
 import argparse
 import asyncio
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -24,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 # Import tools
 from tools import block_ip, quarantine_user
 
-from tenuo import SigningKey, Warrant
+from tenuo import Authorizer, SigningKey, Warrant
 from tenuo.exceptions import AuthorizationError, ConstraintViolation
 
 
@@ -122,7 +123,7 @@ class ResponderService:
         """
         Handle IP blocking request.
 
-        CRITICAL: Uses warrant.authorize() for Tier 2 validation.
+        CRITICAL: Uses Authorizer.authorize() for Tier 2 validation.
         This is where the attenuated constraint (Exact vs Cidr) is enforced!
 
         If warrant has Exact("203.0.113.5"), only that IP can be blocked.
@@ -134,17 +135,18 @@ class ResponderService:
         if not ip:
             raise ValueError("Missing required parameter: ip")
 
-        # TIER 2 AUTHORIZATION: Use warrant.authorize() with PoP signature
+        # TIER 2 AUTHORIZATION: Use Authorizer.authorize() with a PoP signature.
         # This is the SECURITY BOUNDARY - constraint checking happens in Rust!
         try:
-            pop_signature = self.signing_key.sign(
-                f"block_ip:{ip}:{duration}".encode()
+            args = {"ip": ip, "duration": duration}
+            pop_signature = self.warrant.sign(
+                self.signing_key, "block_ip", args, int(time.time())
             )
-            self.warrant.authorize(
-                tool="block_ip",
-                args={"ip": ip, "duration": duration},
-                signature=pop_signature,
-            )
+            # In production, configure the Authorizer with your control plane's
+            # root public key. For this single-delegation demo the warrant's
+            # issuer is the trusted root.
+            authorizer = Authorizer(trusted_roots=[self.warrant.issuer])
+            authorizer.authorize(self.warrant, "block_ip", args, bytes(pop_signature))
         except Exception as e:
             # Re-raise as AuthorizationError for consistent handling
             raise AuthorizationError(f"Authorization failed: {e}")
@@ -153,14 +155,14 @@ class ResponderService:
         result = block_ip(ip, duration)
 
         # Get warrant ID for audit trail
-        jti = self.warrant.jti
-        jti_str = jti.hex() if hasattr(jti, 'hex') else str(jti)
+        warrant_id = self.warrant.id
+        warrant_id_str = warrant_id.hex() if hasattr(warrant_id, "hex") else str(warrant_id)
 
         return {
             "success": True,
             "data": result,
-            "warrant_jti": jti_str,
-            "authorized_by": "warrant.authorize()",  # Proof of Tier 2
+            "warrant_id": warrant_id_str,
+            "authorized_by": "Authorizer.authorize()",  # Proof of Tier 2
         }
 
     async def _handle_quarantine_user(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -172,28 +174,26 @@ class ResponderService:
 
         # TIER 2 AUTHORIZATION
         try:
-            pop_signature = self.signing_key.sign(
-                f"quarantine_user:{user_id}".encode()
+            args = {"user_id": user_id}
+            pop_signature = self.warrant.sign(
+                self.signing_key, "quarantine_user", args, int(time.time())
             )
-            self.warrant.authorize(
-                tool="quarantine_user",
-                args={"user_id": user_id},
-                signature=pop_signature,
-            )
+            authorizer = Authorizer(trusted_roots=[self.warrant.issuer])
+            authorizer.authorize(self.warrant, "quarantine_user", args, bytes(pop_signature))
         except Exception as e:
             raise AuthorizationError(f"Authorization failed: {e}")
 
         # Authorized - execute tool
         result = quarantine_user(user_id)
 
-        jti = self.warrant.jti
-        jti_str = jti.hex() if hasattr(jti, 'hex') else str(jti)
+        warrant_id = self.warrant.id
+        warrant_id_str = warrant_id.hex() if hasattr(warrant_id, "hex") else str(warrant_id)
 
         return {
             "success": True,
             "data": result,
-            "warrant_jti": jti_str,
-            "authorized_by": "warrant.authorize()",
+            "warrant_id": warrant_id_str,
+            "authorized_by": "Authorizer.authorize()",
         }
 
     async def start(self):

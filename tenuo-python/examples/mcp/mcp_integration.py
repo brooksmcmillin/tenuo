@@ -129,17 +129,16 @@ def main():
         # Create PoP signature
         pop_signature = warrant.sign(control_keypair, "filesystem_read", constraints_dict, int(time.time()))
 
-        authorized = warrant.authorize(
-            tool="filesystem_read",
-            args=constraints_dict,  # Use extracted constraints directly (names match warrant)
-            signature=bytes(pop_signature),
+        # Authorizer.authorize() raises on denial (trust, chain, PoP, constraints)
+        authorizer.authorize(
+            warrant,
+            "filesystem_read",
+            constraints_dict,  # Use extracted constraints directly (names match warrant)
+            bytes(pop_signature),
         )
-        if authorized:
-            print("   [OK] Warrant authorization: Allowed")
-        else:
-            print("   [ERR] Warrant authorization: Denied (constraints not satisfied)")
+        print("   [OK] Warrant authorization: Allowed")
     except Exception as e:
-        print(f"   [ERR] Warrant authorization error: {e}")
+        print(f"   [ERR] Warrant authorization: Denied ({e})")
 
     # 7. Full authorization with Authorizer (verifies signature + constraints)
     print("\n7. Full authorization with Authorizer.check()...")
@@ -199,12 +198,14 @@ def demo_without_config(control_keypair):
     # Authorize
     try:
         pop_sig = warrant.sign(control_keypair, "filesystem_read", extracted_constraints, int(time.time()))
-        authorized = warrant.authorize("filesystem_read", extracted_constraints, bytes(pop_sig))
-        print(f"\n✓ Warrant authorization: {authorized}")
 
-        # Full authorization with Authorizer
         public_key = control_keypair.public_key
         authorizer = Authorizer(trusted_roots=[public_key])
+
+        # Authorizer.authorize() raises on denial (signature + constraints)
+        authorizer.authorize(warrant, "filesystem_read", extracted_constraints, bytes(pop_sig))
+        print("\n✓ Warrant authorization: Allowed")
+
         try:
             authorizer.check(warrant, "filesystem_read", extracted_constraints, bytes(pop_sig))
             print("✓ Full authorization (Authorizer.check): Success")

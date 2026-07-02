@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "tenuo"
-version = "0.2.0"
+version = "0.2.3"
 description = "Capability tokens for AI agents - Python SDK"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -84,6 +84,12 @@ temporal = [
 fastapi = [
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",  # ASGI server for FastAPI
+]
+cloud = [
+    # Proprietary SDK for connecting to Tenuo Cloud. Published separately;
+    # intentionally excluded from the `dev` extra so open-source installs / CI
+    # do not require access to the proprietary package.
+    "tenuo-cloud>=0.2,<0.3",
 ]
 
 # Development dependencies (includes features + tools)

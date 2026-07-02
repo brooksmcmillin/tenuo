@@ -26,7 +26,7 @@ Tenuo integrates with [CrewAI](https://crewai.com) using a **two-tier** protecti
 ## Installation
 
 ```bash
-uv pip install tenuo crewai
+uv pip install "tenuo[crewai]"
 ```
 
 ---
@@ -786,8 +786,8 @@ A: Ensure you are wrapping a standard CrewAI `Tool`. If using custom classes, th
 
 ## See Also
 
-- [GuardedCrew Example](../examples/crewai/guarded_crew.py) - Policy-based protection
-- [Flow Example](../examples/crewai/guarded_flow.py) - Guarded steps in CrewAI Flows
+- [GuardedCrew Example](../tenuo-python/examples/crewai/guarded_crew.py) - Policy-based protection
+- [Flow Example](../tenuo-python/examples/crewai/guarded_flow.py) - Guarded steps in CrewAI Flows
 - [OpenAI Integration](./openai) - Tool protection for OpenAI
 - [LangGraph Integration](./langgraph) - Multi-agent graph security
 - [Constraints Reference](./constraints) - All constraint types

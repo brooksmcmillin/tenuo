@@ -434,9 +434,9 @@ With Tenuo: the model processes the resume and generates the `send_email` call. 
 - [EU AI Act (official consolidated text)](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689), the authoritative source for all article numbers cited here.
 - [EU AI Act Service Desk](https://artificialintelligenceact.eu/), official guidance and FAQ.
 - [Annex III: High-Risk AI Systems](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689#d1e38-206-1), full list of high-risk application domains.
-- [Tenuo security model](/security), cryptographic guarantees and threat model.
-- [Constraint reference](/constraints), all constraint types with semantics and examples.
-- [OWASP Top 10 for Agentic Applications (2026) mapping](/owasp), Tenuo's coverage against the OWASP agentic risk framework.
+- [Tenuo security model](./security), cryptographic guarantees and threat model.
+- [Constraint reference](./constraints), all constraint types with semantics and examples.
+- [OWASP Top 10 for Agentic Applications (2026) mapping](./owasp), Tenuo's coverage against the OWASP agentic risk framework.
 
 ---
 

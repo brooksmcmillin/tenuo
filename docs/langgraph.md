@@ -627,7 +627,7 @@ except ConstraintViolation as e:
 | `ConstraintViolation` | 1501 | Argument violates constraint | Request within bounds |
 | `ExpiredError` | 1300 | TTL exceeded | Request fresh warrant |
 
-See [wire format specification](/docs/spec/wire-format-v1#appendix-a-error-codes) for the complete list.
+See [wire format specification](./spec/wire-format-v1#appendix-a-error-code-reference) for the complete list.
 
 ---
 
