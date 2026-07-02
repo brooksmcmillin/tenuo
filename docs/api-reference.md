@@ -1312,7 +1312,29 @@ Returns `MCPVerificationResult` with:
 - `clean_arguments` - Tool arguments safe to pass to the handler
 - `is_approval_required` - Whether an approval gate requires approval
 - `jsonrpc_error_code` - `-32001` (denied), `-32002` (approval required), or `-32602` (invalid params)
+- `approval_metadata` - When present on `-32002`, carries `got` and `need` for partial multi-sig retry
 - `to_jsonrpc_error()` - Format as JSON-RPC error response
+
+### Human approvals and retry signals
+
+Multi-sig warrants and approval gates can require callers to collect signed approvals and retry. The distinct **`InsufficientApprovals`** signal (partial multi-sig: some approvals supplied, threshold not met) must be handled separately from scope denials.
+
+| Integration | Retry signal | Key fields |
+|-------------|--------------|------------|
+| Core / `@guard` / LangChain / OpenAI / AutoGen | `InsufficientApprovals` exception | `details["required"]`, `details["received"]` |
+| MCP server | JSON-RPC `-32002` | `data.got`, `data.need` |
+| MCP client (`MCPApprovalRequired`) | Exception on `-32002` | `got`, `need`, `request_hash` |
+| FastAPI | HTTP **409** | `error: "insufficient_approvals"`, `got`, `need` |
+| A2A | `-32020` / wire **1700** | `required`, `received` |
+| Temporal | `ApplicationError.type == "insufficient_approvals"` | message + cause |
+| Google ADK | `{error: "insufficient_approvals"}` dict or raised exception | `got`, `need` |
+| CrewAI | `InsufficientApprovalsDenied` | `got`, `need` on adapter exception |
+
+Gate-first flows (no approvals yet) use **`approval_required`** / MCP `-32002` without counts, A2A `-32019`, FastAPI 409 with `request_hash`.
+
+Malformed approval wire payloads fail closed: HTTP **400** (`invalid_approval`) on FastAPI, A2A `-32021`, Temporal `invalid_approval`.
+
+See [Human Approvals](approvals.md) for mint-time configuration (`.min_approvals()`, `.approval_gates()`) and wire encoding.
 
 ### verify_mcp_call
 

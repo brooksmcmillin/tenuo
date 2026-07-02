@@ -288,10 +288,14 @@ class MCPApprovalRequired(MCPAuthorizationError):
         result: Optional[MCPVerificationResult] = None,
         raw_error: Optional[Any] = None,
         request_hash: Optional[str] = None,
+        got: Optional[int] = None,
+        need: Optional[int] = None,
     ) -> None:
         self.tool_name = tool_name
         self.raw_error = raw_error
         self.request_hash = request_hash
+        self.got = got
+        self.need = need
         if result is not None:
             if request_hash and not result.request_hash:
                 result = MCPVerificationResult(

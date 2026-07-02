@@ -258,6 +258,137 @@ def test_temporal_wire_type_matches_contract(row: ErrorTypeContract) -> None:
 
 
 # ---------------------------------------------------------------------------
+# @guard (decorators._map_result_to_guard_error)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("row", _integration_rows("guard"), ids=_row_ids)
+def test_guard_mapper_matches_contract(row: ErrorTypeContract) -> None:
+    from tenuo import SigningKey, Warrant
+    from tenuo.decorators import _map_result_to_guard_error
+
+    exp = row.integrations["guard"]
+    assert exp.raises is not None
+    key = SigningKey.generate()
+    warrant = Warrant.mint_builder().tool("transfer").mint(key)
+    with pytest.raises(exp.raises):
+        _map_result_to_guard_error(
+            row.result_factory(),
+            warrant,
+            "transfer",
+            row.result_factory().arguments,
+            "test",
+            "fn",
+        )
+
+
+# ---------------------------------------------------------------------------
+# LangChain (TenuoTool._check_authorization)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("row", _integration_rows("langchain"), ids=_row_ids)
+def test_langchain_check_authorization_matches_contract(row: ErrorTypeContract) -> None:
+    from unittest.mock import MagicMock
+
+    from tenuo.langchain import TenuoTool
+
+    exp = row.integrations["langchain"]
+    assert exp.raises is not None
+    result = row.result_factory()
+    tool = MagicMock()
+    bw = MagicMock()
+
+    def _fake_run(tool_input: dict, bound_warrant: object) -> None:
+        if not result.allowed:
+            result.raise_if_denied()
+
+    tool._resolve_bound_warrant.return_value = bw
+    tool._run_enforcement = _fake_run
+
+    with pytest.raises(exp.raises):
+        TenuoTool._check_authorization(tool, result.arguments)
+
+
+# ---------------------------------------------------------------------------
+# MCP client local enforcement (_raise_for_denial)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("row", _integration_rows("mcp_client"), ids=_row_ids)
+def test_mcp_client_raise_for_denial_matches_contract(row: ErrorTypeContract) -> None:
+    from tenuo.mcp.client import _raise_for_denial
+
+    exp = row.integrations["mcp_client"]
+    assert exp.raises is not None
+    with pytest.raises(exp.raises):
+        _raise_for_denial(row.result_factory(), "transfer")
+
+
+# ---------------------------------------------------------------------------
+# AutoGen (GuardBuilder Tier 2 _authorize)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("row", _integration_rows("autogen"), ids=_row_ids)
+def test_autogen_authorize_matches_contract(row: ErrorTypeContract) -> None:
+    from unittest.mock import patch
+
+    from tenuo import SigningKey, Warrant
+    from tenuo.autogen import GuardBuilder
+
+    exp = row.integrations["autogen"]
+    assert exp.raises is not None
+    key = SigningKey.generate()
+    warrant = Warrant.mint_builder().tool("transfer").mint(key)
+
+    def transfer(amount: int) -> str:
+        return str(amount)
+
+    guard = (
+        GuardBuilder()
+        .with_warrant(warrant, key)
+        .with_trusted_roots([key.public_key])
+        .build()
+    )
+    guarded = guard.guard_tool(transfer, tool_name="transfer")
+
+    with patch("tenuo.autogen.enforce_tool_call", return_value=row.result_factory()):
+        with pytest.raises(exp.raises):
+            guarded(amount=100)
+
+
+# ---------------------------------------------------------------------------
+# Google ADK (_deny_insufficient_approvals)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("row", _integration_rows("google_adk"), ids=_row_ids)
+def test_google_adk_denial_dict_matches_contract(row: ErrorTypeContract) -> None:
+    pytest.importorskip("google.adk")
+    from unittest.mock import MagicMock
+
+    from tenuo.google_adk.guard import TenuoGuard
+
+    exp = row.integrations["google_adk"]
+    assert exp.returns_error_dict is not None
+    guard = TenuoGuard.__new__(TenuoGuard)
+    guard._dry_run = False
+    guard._on_denial = "return"
+    guard._denial_detail = "full"
+    guard._audit = MagicMock()
+
+    out = guard._deny_insufficient_approvals(
+        row.result_factory(), "transfer", row.result_factory().arguments
+    )
+    assert isinstance(out, dict)
+    assert out["error"] == exp.returns_error_dict
+    if exp.got_need_in_payload:
+        assert out["got"] == 1
+        assert out["need"] == 2
+
+
+# ---------------------------------------------------------------------------
 # Structural: explicit auth exception catch lists
 # ---------------------------------------------------------------------------
 
