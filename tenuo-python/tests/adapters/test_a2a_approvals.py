@@ -117,11 +117,12 @@ class TestDecodeApprovals:
         assert result is not None
         assert len(result) == 1
 
-    def test_returns_none_on_malformed_payload(self):
-        """Malformed approval data returns None (logged, not raised)."""
+    def test_raises_invalid_approval_on_malformed_payload(self):
+        """Malformed approval data raises InvalidApprovalError (-32021)."""
         wire_value = base64.b64encode(b"not valid json").decode()
         req = _make_request({APPROVALS_HEADER: wire_value})
-        assert A2AServer._decode_approvals(req, {}) is None
+        with pytest.raises(InvalidApprovalError):
+            A2AServer._decode_approvals(req, {})
 
 
 # =============================================================================
@@ -146,7 +147,7 @@ class TestApprovalErrors:
         rpc = err.to_jsonrpc_error()
         assert rpc["data"]["required"] == 3
         assert rpc["data"]["received"] == 1
-        assert rpc["data"]["tenuo_code"] == 1702
+        assert rpc["data"]["tenuo_code"] == 1700
 
     def test_invalid_approval_error_code(self):
         err = InvalidApprovalError("bad format")

@@ -17,7 +17,15 @@ import threading
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from tenuo.exceptions import ApprovalGateTriggered
+from tenuo.exceptions import (
+    ApprovalGateTriggered,
+    ApprovalExpired,
+    ConstraintViolation,
+    InsufficientApprovals,
+    InvalidApproval,
+    RevokedError,
+    ToolNotAuthorized,
+)
 from tenuo.temporal._constants import (
     TENUO_APPROVALS_HEADER,
     TENUO_ARG_KEYS_HEADER,
@@ -575,6 +583,20 @@ class TenuoWorkerInterceptor(_TemporalWorkerInterceptor):
 
 # ── Activity Inbound Interceptor ─────────────────────────────────────────
 
+
+def _constraint_label_from_auth_exc(auth_exc: Exception) -> Optional[str]:
+    """Extract a constraint label for denial metrics/audit from an auth exception."""
+    from tenuo.exceptions import ConstraintViolation as CoreConstraintViolation
+
+    if isinstance(auth_exc, TemporalConstraintViolation):
+        return auth_exc.constraint
+    if isinstance(auth_exc, CoreConstraintViolation):
+        from tenuo._enforcement import _constraint_field_from_exception
+
+        return _constraint_field_from_exception(auth_exc)
+    return None
+
+
 class TenuoActivityInboundInterceptor:
     """Activity-level interceptor that performs authorization checks."""
 
@@ -944,7 +966,7 @@ class TenuoActivityInboundInterceptor:
                     ) from _e
 
             # -- 11. Multi-Sig Approval Resolution --
-            gate_approvals = self._resolve_approval_gate_approvals(
+            gate_approvals = await self._resolve_approval_gate_approvals(
                 warrant, tool_name, args, headers,
             )
 
@@ -988,20 +1010,40 @@ class TenuoActivityInboundInterceptor:
             ChainValidationError,
             WarrantExpired,
             ApprovalGateTriggered,
+            InsufficientApprovals,
+            ToolNotAuthorized,
+            ConstraintViolation,
+            InvalidApproval,
+            ApprovalExpired,
+            RevokedError,
         ) as auth_exc:
-            # ``ApprovalGateTriggered`` is listed explicitly so it reaches the
-            # wire with its own ``ApplicationError.type`` (``approval_required``
-            # via ``_error_type_for_wire``) rather than being collapsed into a
-            # generic ``TemporalConstraintViolation`` by the fallback branch
-            # below. Clients can then distinguish "needs approval" from
-            # "denied" without string-matching the message.
+            # Approval, tool, constraint, and revocation errors are listed
+            # explicitly so they reach the wire with their own
+            # ``ApplicationError.type`` via ``_error_type_for_wire`` rather than
+            # being collapsed into a generic ``TemporalConstraintViolation``.
+            self._emit_denial_event(
+                info=info,
+                warrant=warrant,
+                tool=tool_name,
+                args=args,
+                reason=str(auth_exc),
+                constraint=_constraint_label_from_auth_exc(auth_exc),
+                start_ns=start_ns,
+            )
             if _active_span is not None:
                 _active_span.set_attribute("tenuo.decision", "deny")
                 _active_span.set_attribute("tenuo.constraint_violated", "")
                 if _span_ctx is not None:
                     _span_ctx.__exit__(None, None, None)
                     _span_ctx = None
-            raise self._wrap_as_non_retryable(auth_exc) from auth_exc
+            # Honor dry_run / on_denial like the generic branch below, but keep
+            # raising ``auth_exc`` itself so it reaches the wire with its own
+            # ``ApplicationError.type`` rather than a generic
+            # ``TemporalConstraintViolation``. In dry-run mode the activity still
+            # executes (shadow); in ``log`` mode it is denied without raising.
+            if self._config.on_denial == "raise" and not self._config.dry_run:
+                raise self._wrap_as_non_retryable(auth_exc) from auth_exc
+            return await _deny_or_continue(tool=tool_name, reason=str(auth_exc))
         except Exception as e:
             try:
                 from tenuo.exceptions import TenuoError as _TenuoError
@@ -1087,7 +1129,7 @@ class TenuoActivityInboundInterceptor:
 
         return await self._next.execute_activity(input)
 
-    def _resolve_approval_gate_approvals(
+    async def _resolve_approval_gate_approvals(
         self,
         warrant: Any,
         tool_name: str,
@@ -1110,51 +1152,39 @@ class TenuoActivityInboundInterceptor:
                     CoreSignedApproval.from_bytes(base64.b64decode(a))
                     for a in approvals_list
                 ]
-            except Exception as e:
-                logger.warning(f"Failed to decode approvals header: {e}")
+            except Exception as exc:
+                raise InvalidApproval(
+                    f"Malformed x-tenuo-approvals header: {exc}",
+                ) from exc
 
         handler = self._config.approval_handler if self._config else None
         if handler is not None:
-            try:
-                from tenuo_core import py_compute_request_hash as _compute_hash
-                from tenuo.approval import ApprovalRequest
+            from tenuo_core import py_compute_request_hash as _compute_hash
+            from tenuo.approval import ApprovalRequest
 
-                holder_key = getattr(warrant, "holder_key", None)
-                warrant_id = getattr(warrant, "id", "") or ""
-                request_hash = _compute_hash(warrant_id, tool_name, args, holder_key)
-                request = ApprovalRequest.for_warrant_gate(
-                    tool_name,
-                    args,
-                    warrant,
-                    request_hash,
-                    holder_key=holder_key,
-                )
+            holder_key = getattr(warrant, "holder_key", None)
+            warrant_id = getattr(warrant, "id", "") or ""
+            request_hash = _compute_hash(warrant_id, tool_name, args, holder_key)
+            request = ApprovalRequest.for_warrant_gate(
+                tool_name,
+                args,
+                warrant,
+                request_hash,
+                holder_key=holder_key,
+            )
 
-                result = handler(request)
-                if _inspect.isawaitable(result):
-                    import asyncio
-                    from typing import cast, Coroutine as _Coro
-                    coro = cast(_Coro[Any, Any, Any], result)
-                    try:
-                        loop = asyncio.get_running_loop()
-                    except RuntimeError:
-                        loop = None
-                    if loop and loop.is_running():
-                        future = asyncio.run_coroutine_threadsafe(coro, loop)
-                        result = future.result(timeout=300)
-                    else:
-                        result = asyncio.run(coro)
+            result = handler(request)
+            if _inspect.isawaitable(result):
+                result = await result
 
-                collected = result if isinstance(result, list) else [result]
+            collected = result if isinstance(result, list) else [result]
 
-                approvers = warrant.required_approvers()
-                threshold = warrant.approval_threshold()
-                from tenuo_core import verify_approvals as _verify
-                _verify(request_hash, collected, approvers, threshold)
+            approvers = warrant.required_approvers()
+            threshold = warrant.approval_threshold()
+            from tenuo_core import verify_approvals as _verify
+            _verify(request_hash, collected, approvers, threshold)
 
-                return collected
-            except Exception:
-                raise
+            return collected
 
         raise ApprovalGateTriggered(
             tool=tool_name,

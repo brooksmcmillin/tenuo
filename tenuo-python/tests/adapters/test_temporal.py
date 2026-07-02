@@ -2884,6 +2884,66 @@ class TestApprovalGates:
         assert "approval" in msg.lower() or "gate" in msg.lower() or \
             isinstance(exc_info.value, ApprovalGateTriggered)
 
+    def test_malformed_approvals_header_raises_invalid_approval(self):
+        """Malformed x-tenuo-approvals must raise InvalidApproval, not be ignored."""
+        import time as _time
+
+        from tenuo import SigningKey
+        from tenuo.exceptions import InvalidApproval
+
+        control_key = SigningKey.generate()
+        agent_key = SigningKey.generate()
+        approver_key = SigningKey.generate()
+
+        warrant = self._mint_gated_warrant(
+            control_key, agent_key, approver_key=approver_key,
+        )
+        pop = warrant.sign(agent_key, "deploy", {}, int(_time.time()))
+
+        cfg = TenuoPluginConfig(
+            key_resolver=EnvKeyResolver(),
+            trusted_roots=[control_key.public_key],
+        )
+        plugin = TenuoWorkerInterceptor(cfg)
+        info, inp = self._build_activity_inputs(
+            warrant, pop, approvals_header=b"not-json",
+        )
+
+        with pytest.raises((InvalidApproval, Exception)) as exc_info:
+            self._run(plugin, info, inp)
+        msg = str(exc_info.value).lower()
+        assert isinstance(exc_info.value, InvalidApproval) or "invalid" in msg
+
+    def test_async_approval_handler_allows_gated_activity(self):
+        """Async approval_handler must be awaited, not deadlocked on the activity loop."""
+        import time as _time
+
+        from tenuo import SigningKey
+
+        control_key = SigningKey.generate()
+        agent_key = SigningKey.generate()
+        approver_key = SigningKey.generate()
+
+        warrant = self._mint_gated_warrant(
+            control_key, agent_key, approver_key=approver_key,
+        )
+        signed = self._sign_approval(warrant, approver_key, "deploy", {})
+        pop = warrant.sign(agent_key, "deploy", {}, int(_time.time()))
+
+        async def handler(request):
+            return signed
+
+        cfg = TenuoPluginConfig(
+            key_resolver=EnvKeyResolver(),
+            trusted_roots=[control_key.public_key],
+            approval_handler=handler,
+        )
+        plugin = TenuoWorkerInterceptor(cfg)
+        info, inp = self._build_activity_inputs(warrant, pop)
+
+        result = self._run(plugin, info, inp)
+        assert result == "ok"
+
 
 # =============================================================================
 # block_local_activities
