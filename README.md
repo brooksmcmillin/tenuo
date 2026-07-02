@@ -29,7 +29,7 @@ Tenuo is designed for teams running tool-calling and multi-agent workflows where
 
 It can be deployed in-process or at boundary enforcement points (sidecar/gateway), with the same warrant semantics and enforcement behavior.
 
-> **Status: v0.2 — Production/Stable.** Core semantics are stable. See [CHANGELOG](./CHANGELOG.md).
+> **Status: v0.2 - Production/Stable.** Core semantics are stable. See [CHANGELOG](./CHANGELOG.md).
 
 ```bash
 # Using uv (recommended)
@@ -293,8 +293,8 @@ async def search(query: str, ctx: SecurityContext = Depends(TenuoGuard("search")
 
 | Component | Supported |
 |-----------|-----------|
-| **Python** | 3.9 – 3.14 |
-| **Node.js** | *Planned (TypeScript SDK — [help wanted](#contributing))* |
+| **Python** | 3.9 - 3.14 |
+| **Node.js** | *Planned (TypeScript SDK - [help wanted](#contributing))* |
 | **OS** | Linux, macOS, Windows |
 | **Rust** | Not required (binary wheels for macOS, Linux, Windows) |
 

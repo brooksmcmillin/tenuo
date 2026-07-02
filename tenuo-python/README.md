@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/tenuo.svg)](https://pypi.org/project/tenuo/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/tenuo.svg)](https://pypi.org/project/tenuo/)
 
-> **Status: v0.2 — Production/Stable.** Core semantics are stable. See [CHANGELOG](../CHANGELOG.md).
+> **Status: v0.2 - Production/Stable.** Core semantics are stable. See [CHANGELOG](../CHANGELOG.md).
 
 Python bindings for [Tenuo](https://github.com/tenuo-ai/tenuo), providing cryptographically-enforced capability attenuation for AI agent workflows.
 
@@ -168,12 +168,14 @@ agent_key = SigningKey.from_env("AGENT_KEY")  # Agent's private key (never share
 warrant = Warrant(received_warrant_string)    # Deserialize from orchestrator
 
 args = {"cluster": "staging-web", "replicas": 5}
-pop_sig = warrant.sign(agent_key, "manage_infrastructure", args)
-authorized = warrant.authorize(
-    tool="manage_infrastructure",
-    args=args,
-    signature=bytes(pop_sig)
-)
+
+# Produce transport headers with the warrant and holder proof.
+headers = warrant.headers(agent_key, "manage_infrastructure", args)
+
+# Or validate locally before executing.
+result = warrant.validate(agent_key, "manage_infrastructure", args)
+if result:
+    run_infrastructure_action(args)
 ```
 
 ## Key Management
@@ -566,7 +568,7 @@ warrant.capabilities   # dict of tool -> constraints
 
 _(Requires Python ≥3.10)_
 
-**Client** — connect to any MCP server with automatic warrant injection:
+**Client**: connect to any MCP server with automatic warrant injection:
 
 ```python
 from tenuo.mcp import SecureMCPClient
@@ -585,7 +587,7 @@ async with SecureMCPClient(
     ...
 ```
 
-**Server** — verify warrants inside MCP tool handlers:
+**Server**: verify warrants inside MCP tool handlers:
 
 ```python
 from tenuo import Authorizer, PublicKey, CompiledMcpConfig, McpConfig
@@ -602,7 +604,7 @@ async def read_file(path: str, **kwargs) -> str:
     return open(clean["path"]).read()
 ```
 
-MCP servers return JSON-RPC `-32002` when an approval gate fires or multi-sig threshold is not met — retry with `_meta.tenuo.approvals`. See [Human Approvals](../docs/approvals.md).
+MCP servers return JSON-RPC `-32002` when an approval gate fires or multi-sig threshold is not met; retry with `_meta.tenuo.approvals`. See [Human Approvals](../docs/approvals.md).
 
 ## Security Considerations
 
