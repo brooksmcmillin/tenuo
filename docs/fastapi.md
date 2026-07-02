@@ -294,7 +294,7 @@ Common error codes:
 
 Approval retries use **409 Conflict** (not 403) so clients can branch separately from scope denials. Re-submit with `X-Tenuo-Approvals`. See [Human Approvals](approvals.md#signals-by-integration).
 
-See [wire format specification](/docs/spec/wire-format-v1#appendix-a-error-codes) for the complete list.
+See [wire format specification](./spec/wire-format-v1#appendix-a-error-code-reference) for the complete list.
 
 ### Status Codes
 

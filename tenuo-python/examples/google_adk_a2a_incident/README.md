@@ -50,7 +50,7 @@ This demo shows how to build **multi-service agent systems** where:
 
 ### 2. **A2A Protocol Integration**
 - Warrants serialized and transmitted over HTTP
-- **Tier 2 authorization** with `warrant.authorize()` in Rust core
+- **Tier 2 authorization** with `Authorizer.authorize()` in Rust core
 - Cryptographic signature validation at each hop
 - Replay protection via JTI (warrant ID) tracking
 

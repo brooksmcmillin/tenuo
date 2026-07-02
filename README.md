@@ -294,7 +294,7 @@ async def search(query: str, ctx: SecurityContext = Depends(TenuoGuard("search")
 | Component | Supported |
 |-----------|-----------|
 | **Python** | 3.9 – 3.14 |
-| **Node.js** | *Coming v0.2* |
+| **Node.js** | *Planned (TypeScript SDK — [help wanted](#contributing))* |
 | **OS** | Linux, macOS, Windows |
 | **Rust** | Not required (binary wheels for macOS, Linux, Windows) |
 
@@ -313,6 +313,7 @@ uv pip install "tenuo[temporal]"      # + Temporal workflows
 uv pip install "tenuo[autogen]"       # + AutoGen AgentChat (Python ≥3.10)
 uv pip install "tenuo[mcp]"           # + official MCP SDK, client & server verification (Python ≥3.10)
 uv pip install "tenuo[fastmcp]"       # + FastMCP (TenuoMiddleware / FastMCP servers)
+uv pip install "tenuo[cloud]"         # + Tenuo Cloud SDK (proprietary control-plane client)
 ```
 
 ---
@@ -330,8 +331,8 @@ This runs the [orchestrator -> worker -> authorizer demo](https://tenuo.ai/demo.
 **Official Images** on [Docker Hub](https://hub.docker.com/u/tenuo):
 
 ```bash
-docker pull tenuo/authorizer:0.2.0  # Sidecar for warrant verification
-docker pull tenuo/control:0.2.0     # Control plane (demo/reference)
+docker pull tenuo/authorizer:0.2.3  # Sidecar for warrant verification
+docker pull tenuo/control:0.2.3     # Control plane (demo/reference)
 ```
 
 **Helm Chart**:
@@ -377,7 +378,7 @@ What you get in Rust:
 
 ```toml
 [dependencies]
-tenuo = "0.2.0"
+tenuo = "0.2.3"
 ```
 
 Use the Rust API when you need a language-native enforcement boundary

@@ -792,8 +792,9 @@ Gates and approvers live on the warrant. Configure `approval_handler` on `TenuoP
 |--------|-------------------------|------------|
 | Gate fired, no approvals | `"approval_required"` | `set_activity_approvals()` or `x-tenuo-approvals` header |
 | Partial multi-sig | `"insufficient_approvals"` | Additional `SignedApproval` objects on retry |
+| Malformed `x-tenuo-approvals` | `"invalid_approval"` | Fix client encoding — **not** a retryable approval state |
 
-**Header encoding:** `x-tenuo-approvals` = JSON array of base64(CBOR) strings — **no** outer base64 wrapper (differs from FastAPI). See [Human Approvals](approvals.md#wire-format-retry-payloads).
+**Header encoding:** `x-tenuo-approvals` = JSON array of base64(CBOR) strings — **no** outer base64 wrapper (differs from FastAPI). See [Human Approvals](approvals.md#wire-format-retry-payloads). A malformed header **fails closed**: the activity is denied with a non-retryable `ApplicationError` of type `"invalid_approval"` (it is not silently treated as "no approvals supplied"), so a bad-encoding client bug is distinguishable from a legitimate insufficient-approvals retry.
 
 ```python
 TenuoPluginConfig(

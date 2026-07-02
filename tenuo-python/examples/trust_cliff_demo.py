@@ -16,6 +16,7 @@ Run:
 import time
 
 from tenuo import (
+    Authorizer,
     Pattern,
     Range,
     SigningKey,
@@ -30,6 +31,18 @@ def main():
     print("=" * 70)
 
     key = SigningKey.generate()
+
+    # Authorizer performs full verification (trust, chain, PoP, constraints).
+    # It raises on denial, so wrap it in a boolean helper for this demo.
+    authorizer = Authorizer()
+    authorizer.add_trusted_root(key.public_key)
+
+    def authorize(warrant, tool, args, pop):
+        try:
+            authorizer.authorize(warrant, tool, args, bytes(pop))
+            return True
+        except Exception:
+            return False
 
     # =========================================================================
     # 1. No Constraints = OPEN (any arguments allowed)
@@ -48,7 +61,7 @@ def main():
     # Create PoP and authorize
     args = {"url": "https://any.com", "timeout": 999, "retries": 100}
     pop = open_warrant.sign(key, "api_call", args, int(time.time()))
-    result = open_warrant.authorize("api_call", args, bytes(pop))
+    result = authorize(open_warrant, "api_call", args, pop)
     if result:
         print("   ✅ ALLOWED: url=https://any.com, timeout=999, retries=100")
         print("   ℹ️  No constraints = all arguments pass through")
@@ -72,7 +85,7 @@ def main():
     # Try with unknown field 'timeout' - should be BLOCKED
     args = {"url": "https://api.example.com/v1", "timeout": 30}
     pop = closed_warrant.sign(key, "api_call", args, int(time.time()))
-    result = closed_warrant.authorize("api_call", args, bytes(pop))
+    result = authorize(closed_warrant, "api_call", args, pop)
     if not result:
         # Get detailed reason
         reason = closed_warrant.check_constraints("api_call", args)
@@ -104,7 +117,7 @@ def main():
 
     args = {"url": "https://api.example.com/v1", "timeout": 30, "retries": 5}
     pop = permissive_warrant.sign(key, "api_call", args, int(time.time()))
-    result = permissive_warrant.authorize("api_call", args, bytes(pop))
+    result = authorize(permissive_warrant, "api_call", args, pop)
     if result:
         print("   ✅ ALLOWED: url, timeout=30, retries=5")
         print("   ℹ️  _allow_unknown: True → unknown fields pass through")
@@ -133,7 +146,7 @@ def main():
     # All fields constrained (even if Wildcard) → allowed
     args = {"url": "https://api.example.com/v1", "timeout": 9999, "retries": 2}
     pop = selective_warrant.sign(key, "api_call", args, int(time.time()))
-    result = selective_warrant.authorize("api_call", args, bytes(pop))
+    result = authorize(selective_warrant, "api_call", args, pop)
     if result:
         print("   ✅ ALLOWED: timeout=9999, retries=2")
         print("   ℹ️  timeout=Wildcard() allows any value")
@@ -144,7 +157,7 @@ def main():
     # Try with retries too high
     args_bad = {"url": "https://api.example.com/v1", "timeout": 30, "retries": 10}
     pop_bad = selective_warrant.sign(key, "api_call", args_bad, int(time.time()))
-    result_bad = selective_warrant.authorize("api_call", args_bad, bytes(pop_bad))
+    result_bad = authorize(selective_warrant, "api_call", args_bad, pop_bad)
     if not result_bad:
         print("   ❌ BLOCKED: retries=10 exceeds Range.max_value(3)")
         print("   ℹ️  Wildcard on 'timeout' doesn't affect 'retries' constraint")
@@ -154,7 +167,7 @@ def main():
     # Try with unknown field - should be blocked even though others have Wildcard
     args_unknown = {"url": "https://api.example.com/v1", "timeout": 30, "retries": 2, "unknown_field": True}
     pop_unknown = selective_warrant.sign(key, "api_call", args_unknown, int(time.time()))
-    result_unknown = selective_warrant.authorize("api_call", args_unknown, bytes(pop_unknown))
+    result_unknown = authorize(selective_warrant, "api_call", args_unknown, pop_unknown)
     if not result_unknown:
         print("   ❌ BLOCKED: 'unknown_field' not in constraint set")
         print("   ℹ️  Wildcard() for specific fields doesn't open everything")
@@ -197,7 +210,7 @@ def main():
     # Child will block unknown fields even though parent allowed them
     args = {"url": "https://api.example.com/v1", "timeout": 30}
     pop = child.sign(key, "api_call", args, int(time.time()))
-    result = child.authorize("api_call", args, bytes(pop))
+    result = authorize(child, "api_call", args, pop)
     if not result:
         reason = child.check_constraints("api_call", args)
         print(f"   ❌ BLOCKED: {reason}")

@@ -267,4 +267,4 @@ Every approval binds to `(warrant_id, tool, args, holder)` via SHA-256 (`compute
 - [Enforcement Architecture](enforcement.md#human-approvals) — Where approvals sit in the pipeline
 - [MCP Approval Gates](mcp.md#approval-gates) — Remote PEP retry flow
 - [FastAPI](fastapi.md#error-handling) — HTTP 409 approval responses
-- [Wire format §16](spec/wire-format-v1.md#16-approval-wire-format) — `SignedApproval` bytes
+- [Wire format §16](spec/wire-format-v1.md#16-approval-wire-format-multi-sig) — `SignedApproval` bytes

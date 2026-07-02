@@ -11,6 +11,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **IETF Draft**: Published `draft-niyikiza-oauth-attenuating-agent-tokens-01`.
 
+## [0.2.3] - 2026-07-02
+
+Covers all changes since the `v0.2.0` release. (Git tags `v0.2.1`/`v0.2.2` were
+never released from `main` and are superseded by this entry.)
+
+### Added
+
+- **Distinct `InsufficientApprovals` retry signal across every integration.**
+  Partial multi-sig (some approvals supplied, threshold not met) now surfaces as
+  a typed, retryable signal instead of collapsing into a generic access denial —
+  in MCP (server + client), FastAPI, Temporal, A2A, LangGraph, OpenAI, AutoGen,
+  CrewAI, Google ADK, LangChain, and the `@guard` decorator. The signal carries
+  structured counts — `got`/`need` (HTTP and MCP wire) or `required`/`received`
+  (Python exceptions and A2A) — so callers can build a retry-with-approval loop
+  without parsing human-readable denial strings. (#466, #484)
+- **Unix domain socket serving mode for the authorizer** (`--socket`,
+  `--socket-mode`, `--socket-group`), letting non-root local clients connect over
+  a filesystem socket. (#463, #465)
+- **`cloud` optional-dependency extra** (`pip install "tenuo[cloud]"`) for the
+  Tenuo Cloud control-plane SDK.
+- **Cross-adapter error-type contract tests** that pin each
+  `EnforcementResult.error_type` to its per-integration signal, preventing
+  integrations from silently drifting apart.
+
+### Changed
+
+- **A2A `INSUFFICIENT_APPROVALS` canonical wire code corrected from `1702` to
+  `1700`** (JSON-RPC `-32020`), aligning with `wire-format-v1`. A2A clients that
+  hard-coded `1702` for insufficient-approvals must update to `1700`.
+
+### Fixed
+
+- **Async Temporal approval handlers are now awaited** instead of being driven
+  through a blocking `run_coroutine_threadsafe` call on the running activity
+  loop, which could deadlock. The typed auth-denial branch now also honors
+  `dry_run` / `on_denial`.
+- **Restored Temporal denial metrics, audit events, and enforcement `WARNING`
+  logs** without losing the typed wire error types.
+- **Rust `FeatureNotEnabled` maps to a typed `FeatureNotEnabled` Python error**
+  rather than a generic `RuntimeError`.
+
+### Security
+
+- **Fail closed on malformed approval wire payloads** instead of silently
+  ignoring them: a malformed approvals header now surfaces as A2A `-32021`,
+  FastAPI HTTP 400 (`invalid_approval`), and Temporal `invalid_approval`, rather
+  than being dropped and treated as "no approvals supplied". (#466 follow-up)
+- **Bumped `quinn-proto`** to resolve RUSTSEC-2026-0185. (#464)
+
 ## [0.1.0-beta.24] - 2026-06-11
 
 ### Fixed

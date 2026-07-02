@@ -702,7 +702,7 @@ This enables:
 
 | A2A JSON-RPC Code | Canonical Wire Code | Name |
 |-------------------|---------------------|------|
-| -32001 | 1202 | Missing warrant |
+| -32001 | — (A2A-specific) | Missing warrant |
 | -32002 | 1100 | Invalid signature |
 | -32003 | 1406 | Untrusted issuer |
 | -32004 | 1300 | Warrant expired |
@@ -713,7 +713,7 @@ This enables:
 | -32020 | 1700 | Insufficient approvals (partial multi-sig) |
 | -32021 | 1701 | Invalid approval |
 
-See [wire format specification](./spec/wire-format-v1#appendix-a-error-codes) for the complete list.
+See [wire format specification](./spec/wire-format-v1#appendix-a-error-code-reference) for the complete list.
 
 ---
 

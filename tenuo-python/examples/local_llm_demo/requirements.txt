@@ -1,4 +1,4 @@
-tenuo>=0.1.0b1
+tenuo>=0.2.3
 lmstudio
 tavily-python
 rich

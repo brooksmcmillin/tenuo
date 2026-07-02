@@ -22,7 +22,7 @@ Complete API documentation for the Tenuo Python SDK. For wire format details, se
 - [Warrant Templates](#warrant-templates)
 - [Task Scoping](#task-scoping)
 - [Tool Protection](#tool-protection)
-- [MCP Integration](#mcp)
+- [MCP Integration](#mcp-integration)
 - [Decorators & Context](#decorators--context)
 - [LangChain Integration](#langchain-integration)
 - [LangGraph Integration](#langgraph-integration)
@@ -497,7 +497,7 @@ print(repr(warrant))
 # <Warrant id=tnu_wrt_019b... tools=[a, b, c, +3 more] ttl=0:04:59>
 ```
 
-**Replay Window:** PoP signatures are valid for ~2 minutes to handle clock skew. For sensitive operations, implement deduplication using `warrant.dedup_key(tool, args)`. See [Protocol: Replay Protection](./spec/protocol-spec-v1#replay-protection).
+**Replay Window:** PoP signatures are valid for ~2 minutes to handle clock skew. For sensitive operations, implement deduplication using `warrant.dedup_key(tool, args)`. See [Protocol: Replay Protection](./spec/protocol-spec-v1#74-replay-protection).
 
 #### Principle of Least Authority (POLA)
 
