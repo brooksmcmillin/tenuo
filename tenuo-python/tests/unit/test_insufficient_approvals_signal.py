@@ -773,3 +773,58 @@ class TestGoogleADKInsufficientApprovals:
 
         with pytest.raises(InsufficientApprovals):
             guard.before_tool(tool, tool_args, context)
+
+
+class TestMCPClientInsufficientApprovals:
+    def test_raise_for_denial_maps_insufficient_approvals(self):
+        from tenuo._enforcement import EnforcementResult
+        from tenuo.mcp.client import _raise_for_denial
+
+        result = EnforcementResult(
+            allowed=False,
+            tool="transfer",
+            arguments={"amount": 500},
+            error_type="insufficient_approvals",
+            approval_metadata={"got": 1, "need": 2},
+        )
+        with pytest.raises(InsufficientApprovals) as exc_info:
+            _raise_for_denial(result, "transfer")
+        assert exc_info.value.details["required"] == 2
+        assert exc_info.value.details["received"] == 1
+
+    def test_mcp_approval_required_carries_got_and_need(self):
+        from tenuo.mcp.server import MCPApprovalRequired
+
+        exc = MCPApprovalRequired(
+            tool_name="transfer",
+            message="need more",
+            request_hash="abc123",
+            got=1,
+            need=2,
+        )
+        assert exc.got == 1
+        assert exc.need == 2
+        assert exc.request_hash == "abc123"
+
+
+class TestGuardInsufficientApprovals:
+    def test_map_result_raises_insufficient_approvals(self):
+        from tenuo import SigningKey, Warrant
+        from tenuo._enforcement import EnforcementResult
+        from tenuo.decorators import _map_result_to_guard_error
+
+        key = SigningKey.generate()
+        warrant = Warrant.mint_builder().tool("transfer").mint(key)
+        result = EnforcementResult(
+            allowed=False,
+            tool="transfer",
+            arguments={"amount": 500},
+            error_type="insufficient_approvals",
+            approval_metadata={"got": 1, "need": 2},
+        )
+        with pytest.raises(InsufficientApprovals) as exc_info:
+            _map_result_to_guard_error(
+                result, warrant, "transfer", {"amount": 500}, "test", "fn"
+            )
+        assert exc_info.value.details["required"] == 2
+        assert exc_info.value.details["received"] == 1

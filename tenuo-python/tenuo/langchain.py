@@ -49,6 +49,9 @@ from .decorators import chain_scope, get_allowed_tools_context, key_scope, warra
 from .exceptions import (
     ConfigurationError,
     ConstraintViolation,
+    ExpiredError,
+    InsufficientApprovals,
+    SignatureInvalid,
     ToolNotAuthorized,
 )
 from .schemas import TOOL_SCHEMAS, ToolSchema, _get_tool_name
@@ -224,7 +227,14 @@ class TenuoTool(BaseTool):  # type: ignore[misc]
             return  # passthrough mode
         try:
             self._run_enforcement(tool_input, bw)
-        except (ToolNotAuthorized, ConstraintViolation, ConfigurationError):
+        except (
+            ToolNotAuthorized,
+            ConstraintViolation,
+            ConfigurationError,
+            InsufficientApprovals,
+            ExpiredError,
+            SignatureInvalid,
+        ):
             raise
         except Exception as e:
             from .approval import ApprovalDenied, ApprovalRequired, ApprovalVerificationError
@@ -243,7 +253,14 @@ class TenuoTool(BaseTool):  # type: ignore[misc]
             return  # passthrough mode
         try:
             await self._run_enforcement_async(tool_input, bw)
-        except (ToolNotAuthorized, ConstraintViolation, ConfigurationError):
+        except (
+            ToolNotAuthorized,
+            ConstraintViolation,
+            ConfigurationError,
+            InsufficientApprovals,
+            ExpiredError,
+            SignatureInvalid,
+        ):
             raise
         except Exception as e:
             from .approval import ApprovalDenied, ApprovalRequired, ApprovalVerificationError

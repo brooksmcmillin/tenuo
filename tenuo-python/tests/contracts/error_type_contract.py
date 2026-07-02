@@ -66,6 +66,7 @@ class IntegrationExpectation:
     tenuo_wire_code: Optional[int] = None
     got_need_in_payload: bool = False
     returns_tool_message: bool = False
+    returns_error_dict: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +108,14 @@ def _rows() -> list[ErrorTypeContract]:
                     got_need_in_payload=True,
                 ),
                 "temporal": IntegrationExpectation(wire_type="insufficient_approvals"),
+                "autogen": IntegrationExpectation(raises=_exc("InsufficientApprovals")),
+                "langchain": IntegrationExpectation(raises=_exc("InsufficientApprovals")),
+                "guard": IntegrationExpectation(raises=_exc("InsufficientApprovals")),
+                "mcp_client": IntegrationExpectation(raises=_exc("InsufficientApprovals")),
+                "google_adk": IntegrationExpectation(
+                    returns_error_dict="insufficient_approvals",
+                    got_need_in_payload=True,
+                ),
             },
         ),
         ErrorTypeContract(
@@ -201,6 +210,11 @@ INTEGRATION_SURFACES = frozenset(
         "mcp",
         "a2a",
         "temporal",
+        "autogen",
+        "langchain",
+        "guard",
+        "mcp_client",
+        "google_adk",
     }
 )
 

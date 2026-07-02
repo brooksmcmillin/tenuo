@@ -23,6 +23,7 @@ from ..exceptions import (
     ConfigurationError,
     ConstraintViolation,
     ExpiredError,
+    InsufficientApprovals,
     MCPToolCallError,
     ToolNotAuthorized,
 )
@@ -62,6 +63,13 @@ def _raise_for_denial(result: "EnforcementResult", tool_name: str) -> None:
         raise ToolNotAuthorized(reason)
     if etype == "expired":
         raise ExpiredError(reason)
+    if etype == "insufficient_approvals":
+        meta = result.approval_metadata or {}
+        raise InsufficientApprovals(
+            required=meta.get("need", 0),
+            received=meta.get("got", 0),
+            detail=reason,
+        )
     raise AuthorizationDenied(reason)
 
 
@@ -678,11 +686,15 @@ class SecureMCPClient:
                             _msg = _safe_mcp_tool_error_message(raw_content, tool_name)
                             _tenuo_block = (structured or {}).get("tenuo") or {}
                             _rh = _tenuo_block.get("request_hash") if isinstance(_tenuo_block, dict) else None
+                            _got = _tenuo_block.get("got") if isinstance(_tenuo_block, dict) else None
+                            _need = _tenuo_block.get("need") if isinstance(_tenuo_block, dict) else None
                             raise MCPApprovalRequired(
                                 tool_name=tool_name,
                                 message=_msg,
                                 raw_error=structured,
                                 request_hash=_rh,
+                                got=_got if isinstance(_got, int) else None,
+                                need=_need if isinstance(_need, int) else None,
                             )
                         if raise_on_tool_error:
                             raise MCPToolCallError(

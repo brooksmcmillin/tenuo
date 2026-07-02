@@ -562,9 +562,19 @@ def _map_result_to_guard_error(
     - ``why_denied().suggestion`` passthrough
     - Structured ``audit_logger`` events with callsite/function metadata
 
-    Raises ``ToolNotAuthorized`` or ``AuthorizationDenied``; never returns.
+    Raises ``ToolNotAuthorized``, ``AuthorizationDenied``, or
+    ``InsufficientApprovals``; never returns.
     """
     from .warrant_ext import DenyCode as _DenyCode
+    from tenuo.exceptions import InsufficientApprovals as _InsufficientApprovals
+
+    if result.error_type == "insufficient_approvals":
+        meta = result.approval_metadata or {}
+        raise _InsufficientApprovals(
+            required=meta.get("need", 0),
+            received=meta.get("got", 0),
+            detail=result.denial_reason or "",
+        )
 
     why = warrant_to_use.why_denied(tool_name, auth_args)
 
