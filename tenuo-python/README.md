@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/tenuo.svg)](https://pypi.org/project/tenuo/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/tenuo.svg)](https://pypi.org/project/tenuo/)
 
-> **Status: v0.2 — Production/Stable.** Core semantics are stable. See [CHANGELOG](../CHANGELOG.md).
+> **Status: v0.2 - Production/Stable.** Core semantics are stable. See [CHANGELOG](../CHANGELOG.md).
 
 Python bindings for [Tenuo](https://github.com/tenuo-ai/tenuo), providing cryptographically-enforced capability attenuation for AI agent workflows.
 
@@ -24,11 +24,29 @@ uv pip install "tenuo[fastapi]"       # + FastAPI
 uv pip install "tenuo[mcp]"           # + official MCP SDK, client/server (Python ≥3.10)
 uv pip install "tenuo[fastmcp]"       # + FastMCP (``TenuoMiddleware``, FastMCP servers)
 uv pip install "tenuo[temporal]"      # + Temporal Python SDK (workflow + activity authorization)
-uv pip install "tenuo[cloud]"         # + Tenuo Cloud SDK (proprietary control-plane client)
+uv pip install "tenuo[cloud]"         # optional: proprietary Tenuo Cloud client (see below)
 ```
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tenuo-ai/tenuo/blob/main/notebooks/tenuo_demo.ipynb)
 [![Explorer](https://img.shields.io/badge/Explorer-decode_warrants-1a1a1a)](https://tenuo.ai/explorer/)
+
+## Tenuo Cloud (optional)
+
+The open-source `tenuo` package implements the **protocol**: warrants, constraints, proof-of-possession, local enforcement, and framework hooks. It runs fully self-hosted with your own keys and authorizer. **No Cloud account required.**
+
+[**Tenuo Cloud**](https://cloud.tenuo.ai) is an **optional** managed control plane on top of that protocol (KMS, agent registry, warrant pipeline, signed revocation lists, signed receipts, discovery, human approvals, REST API). Any language can use Cloud via HTTP; the proprietary Python SDK is not required.
+
+| Path | Install | Details |
+|------|---------|---------|
+| **Self-host** | `pip install tenuo` | Local enforcement; you operate keys and issuance |
+| **Cloud, no SDK** | `pip install tenuo` + `TENUO_API_KEY` | Call the [REST API](https://docs.tenuo.ai/api-reference) yourself (`httpx`, `curl`, etc.) |
+| **Cloud + SDK** | `pip install "tenuo[cloud]"` | Pulls [`tenuo-cloud`](https://pypi.org/project/tenuo-cloud/) (proprietary wheels): Quick Connect, `cloud_approval()`, framework drop-ins |
+
+Combine extras as needed, e.g. `pip install "tenuo[cloud,temporal]"` or `"tenuo[cloud,langgraph]"`.
+
+For Python Cloud integration (credentials, `connect()` / `doctor()`, import swaps, approval gates), see the **[`tenuo-cloud` PyPI README](https://pypi.org/project/tenuo-cloud/)** and **[docs.tenuo.ai](https://docs.tenuo.ai)** — those guides are not part of this open-source repo.
+
+**Claude Code** governance uses [`tenuo-claude-code`](https://pypi.org/project/tenuo-claude-code/) against the same Cloud tenant, not `tenuo-cloud`. See [Claude Code Governance](https://docs.tenuo.ai/guides/claude-code).
 
 ## Development
 
@@ -168,12 +186,14 @@ agent_key = SigningKey.from_env("AGENT_KEY")  # Agent's private key (never share
 warrant = Warrant(received_warrant_string)    # Deserialize from orchestrator
 
 args = {"cluster": "staging-web", "replicas": 5}
-pop_sig = warrant.sign(agent_key, "manage_infrastructure", args)
-authorized = warrant.authorize(
-    tool="manage_infrastructure",
-    args=args,
-    signature=bytes(pop_sig)
-)
+
+# Produce transport headers with the warrant and holder proof.
+headers = warrant.headers(agent_key, "manage_infrastructure", args)
+
+# Or validate locally before executing.
+result = warrant.validate(agent_key, "manage_infrastructure", args)
+if result:
+    run_infrastructure_action(args)
 ```
 
 ## Key Management
@@ -566,7 +586,7 @@ warrant.capabilities   # dict of tool -> constraints
 
 _(Requires Python ≥3.10)_
 
-**Client** — connect to any MCP server with automatic warrant injection:
+**Client**: connect to any MCP server with automatic warrant injection:
 
 ```python
 from tenuo.mcp import SecureMCPClient
@@ -585,7 +605,7 @@ async with SecureMCPClient(
     ...
 ```
 
-**Server** — verify warrants inside MCP tool handlers:
+**Server**: verify warrants inside MCP tool handlers:
 
 ```python
 from tenuo import Authorizer, PublicKey, CompiledMcpConfig, McpConfig
@@ -602,7 +622,7 @@ async def read_file(path: str, **kwargs) -> str:
     return open(clean["path"]).read()
 ```
 
-MCP servers return JSON-RPC `-32002` when an approval gate fires or multi-sig threshold is not met — retry with `_meta.tenuo.approvals`. See [Human Approvals](../docs/approvals.md).
+MCP servers return JSON-RPC `-32002` when an approval gate fires or multi-sig threshold is not met; retry with `_meta.tenuo.approvals`. See [Human Approvals](../docs/approvals.md).
 
 ## Security Considerations
 
@@ -695,6 +715,7 @@ python examples/mcp/mcp_client_demo.py
 - **[CrewAI](https://tenuo.ai/crewai)** - Multi-agent crew protection
 - **[Temporal](https://tenuo.ai/temporal)** - Workflow + activity authorization (replay-safe)
 - **[Security](https://tenuo.ai/security)** - Threat model, best practices
+- **[Tenuo Cloud](https://docs.tenuo.ai)** - Optional managed control plane (API + proprietary [`tenuo-cloud`](https://pypi.org/project/tenuo-cloud/) SDK)
 - **[API Reference](https://tenuo.ai/api-reference)** - Full SDK docs
 
 ## License
