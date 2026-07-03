@@ -24,11 +24,29 @@ uv pip install "tenuo[fastapi]"       # + FastAPI
 uv pip install "tenuo[mcp]"           # + official MCP SDK, client/server (Python ≥3.10)
 uv pip install "tenuo[fastmcp]"       # + FastMCP (``TenuoMiddleware``, FastMCP servers)
 uv pip install "tenuo[temporal]"      # + Temporal Python SDK (workflow + activity authorization)
-uv pip install "tenuo[cloud]"         # + Tenuo Cloud SDK (proprietary control-plane client)
+uv pip install "tenuo[cloud]"         # optional: proprietary Tenuo Cloud client (see below)
 ```
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tenuo-ai/tenuo/blob/main/notebooks/tenuo_demo.ipynb)
 [![Explorer](https://img.shields.io/badge/Explorer-decode_warrants-1a1a1a)](https://tenuo.ai/explorer/)
+
+## Tenuo Cloud (optional)
+
+The open-source `tenuo` package implements the **protocol**: warrants, constraints, proof-of-possession, local enforcement, and framework hooks. It runs fully self-hosted with your own keys and authorizer. **No Cloud account required.**
+
+[**Tenuo Cloud**](https://cloud.tenuo.ai) is an **optional** managed control plane on top of that protocol (KMS, agent registry, warrant pipeline, signed revocation lists, signed receipts, discovery, human approvals, REST API). Any language can use Cloud via HTTP; the proprietary Python SDK is not required.
+
+| Path | Install | Details |
+|------|---------|---------|
+| **Self-host** | `pip install tenuo` | Local enforcement; you operate keys and issuance |
+| **Cloud, no SDK** | `pip install tenuo` + `TENUO_API_KEY` | Call the [REST API](https://docs.tenuo.ai/api-reference) yourself (`httpx`, `curl`, etc.) |
+| **Cloud + SDK** | `pip install "tenuo[cloud]"` | Pulls [`tenuo-cloud`](https://pypi.org/project/tenuo-cloud/) (proprietary wheels): Quick Connect, `cloud_approval()`, framework drop-ins |
+
+Combine extras as needed, e.g. `pip install "tenuo[cloud,temporal]"` or `"tenuo[cloud,langgraph]"`.
+
+For Python Cloud integration (credentials, `connect()` / `doctor()`, import swaps, approval gates), see the **[`tenuo-cloud` PyPI README](https://pypi.org/project/tenuo-cloud/)** and **[docs.tenuo.ai](https://docs.tenuo.ai)** — those guides are not part of this open-source repo.
+
+**Claude Code** governance uses [`tenuo-claude-code`](https://pypi.org/project/tenuo-claude-code/) against the same Cloud tenant, not `tenuo-cloud`. See [Claude Code Governance](https://docs.tenuo.ai/guides/claude-code).
 
 ## Development
 
@@ -697,6 +715,7 @@ python examples/mcp/mcp_client_demo.py
 - **[CrewAI](https://tenuo.ai/crewai)** - Multi-agent crew protection
 - **[Temporal](https://tenuo.ai/temporal)** - Workflow + activity authorization (replay-safe)
 - **[Security](https://tenuo.ai/security)** - Threat model, best practices
+- **[Tenuo Cloud](https://docs.tenuo.ai)** - Optional managed control plane (API + proprietary [`tenuo-cloud`](https://pypi.org/project/tenuo-cloud/) SDK)
 - **[API Reference](https://tenuo.ai/api-reference)** - Full SDK docs
 
 ## License
