@@ -3096,13 +3096,13 @@ fn print_complete_envelope(warrant: &Warrant) {
         warrant.payload_bytes().len(),
         warrant.payload_bytes().len()
     );
-    println!("      {}...", &hex::encode(&warrant.payload_bytes()[..16]));
+    println!("      {}...", hex::encode(&warrant.payload_bytes()[..16]));
     println!("   82                       # signature array(2)");
     println!("      01                    # algorithm = Ed25519");
     println!("      58 40                 # signature bytes (64)");
     println!(
         "         {}...",
-        &hex::encode(&warrant.signature().to_bytes()[..16])
+        hex::encode(&warrant.signature().to_bytes()[..16])
     );
     println!("```");
     println!();
