@@ -15,21 +15,26 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License"></a>
 </p>
 
-> **Tenuo Cloud: Early Access**
->
-> Managed control plane with revocation, observability, and multi-tenant warrant issuance.
->
-> [Request access →](https://tenuo.ai/early-access.html)
-
 Tenuo is cryptographic authorization infrastructure for AI agents. A useful mental model is a prepaid card instead of a corporate Amex: scoped capability tokens that expire with the task.
 
-A **warrant** is a signed token specifying which tools an agent can call, under what constraints, and for how long. It is bound to a cryptographic key, and the caller must prove possession of that key (PoP). Verification is offline (under 50 μs), and delegation attenuates monotonically: authority can narrow but not expand. If an agent is prompt-injected, execution is still limited by warrant constraints.
+Agents stay flexible without turning security into prompt engineering: they can still read across systems, call tools, and delegate work, while sensitive actions remain bounded by deterministic checks at runtime.
 
-Tenuo is designed for teams running tool-calling and multi-agent workflows where authorization must hold at runtime, not just at session start.
+The token is called a **warrant**: a signed grant of which tools an agent can call, under what constraints, and for how long.
+
+- **Holder-bound**: a warrant is tied to a cryptographic key, and the caller must prove possession of it (PoP). A stolen warrant is useless without the key.
+- **Verified offline**: checks run in under 50 μs, with no network calls.
+- **Attenuates monotonically**: delegated authority can narrow but never expand.
+- **Holds under prompt injection**: even a hijacked agent is still limited by its warrant's constraints.
+
+Tenuo is designed for teams running tool-calling and multi-agent workflows where authorization must hold at runtime, not just at session start. For sensitive actions, warrants can also require signed human approvals before execution. See the [approvals guide](./docs/approvals.md).
 
 It can be deployed in-process or at boundary enforcement points (sidecar/gateway), with the same warrant semantics and enforcement behavior.
 
 > **Status: v0.2 - Production/Stable.** Core semantics are stable. See [CHANGELOG](./CHANGELOG.md).
+>
+> **Tenuo Cloud: Early Access.** Managed control plane with revocation, observability, and multi-tenant warrant issuance. [Request access →](https://tenuo.ai/early-access.html)
+
+## Install
 
 ```bash
 # Using uv (recommended)
@@ -38,6 +43,8 @@ uv pip install tenuo
 # Or standard pip
 pip install tenuo
 ```
+
+Or try it without installing:
 
 <a href="https://colab.research.google.com/github/tenuo-ai/tenuo/blob/main/notebooks/tenuo_demo.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"></a>
 <a href="https://tenuo.ai/explorer/"><img src="https://img.shields.io/badge/Explorer-decode_warrants-1a1a1a" alt="Explorer"></a>
@@ -74,18 +81,11 @@ Even if the agent is prompt-injected, enforcement still happens at the tool boun
 
 When the `mint_sync` block exits, the warrant expires naturally. No manual cleanup or revocation flow is required.
 
-30-second architecture:
-
-1. **Issuer** mints a root warrant for a task.
-2. **Delegator** attenuates scope for downstream agents/tools.
-3. **Authorizer** verifies warrant + PoP at the tool-call boundary.
-4. **Signed receipt** records the authorization decision and execution context.
-
 ---
 
 ## Why Tenuo?
 
-IAM answers "who are you?" Tenuo adds "what can this workload do right now for this task?" That gives teams a deterministic authorization boundary at agent speed.
+IAM answers "who are you?" Tenuo adds "what can this workload do right now for this task?" That gives teams a deterministic authorization boundary at agent speed, without reducing useful agents to a static menu of pre-baked behaviors.
 
 | Failure mode in agent systems | Tenuo strength | Practical outcome |
 |------------------------------|----------------|-------------------|
@@ -141,7 +141,7 @@ Tenuo implements **Subtractive Delegation**: each step in the chain can only red
 
 ## Integrations
 
-**OpenAI**: Tool-call enforcement with streaming TOCTOU protection
+**OpenAI**: Tool-call enforcement with streaming TOCTOU (time-of-check/time-of-use) protection
 ```python
 from tenuo.openai import GuardBuilder, Subpath, UrlSafe, Range, Pattern
 
@@ -359,7 +359,7 @@ Self-hosted Tenuo is free forever. The core library and sidecar run entirely in 
 
 See [Security Model](https://tenuo.ai/security) for the full threat model and production hardening guidance.
 
-**[Tenuo Cloud](https://tenuo.ai/early-access.html)** adds managed warrant issuance, key rotation, revocation (SRL), observability dashboards, and multi-tenant isolation for teams that prefer a hosted control plane.
+**[Tenuo Cloud](https://tenuo.ai/early-access.html)** adds managed warrant issuance, key rotation, revocation via signed revocation lists (SRL), observability dashboards, and multi-tenant isolation for teams that prefer a hosted control plane.
 
 ---
 
