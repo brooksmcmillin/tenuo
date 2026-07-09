@@ -256,7 +256,7 @@ impl DelegationDiff {
         let child_id = self.child_warrant_id.as_deref().unwrap_or("(pending)");
         let header = format!(
             "  Parent: {} → Child: {}",
-            &self.parent_warrant_id, child_id
+            self.parent_warrant_id, child_id
         );
         let padding = width.saturating_sub(header.len());
         lines.push(format!("║{}{:padding$}║", header, "", padding = padding));
