@@ -205,7 +205,8 @@ guard = (GuardBuilder()
     .allow("write_file", path=Subpath("/workspace"))
     .build())
 
-crew = guard.protect(my_crew)  # Enforces constraints across crew tools
+guard.register()   # Hooks all crew tool calls; enforces constraints
+my_crew.kickoff()
 ```
 
 **A2A (Agent-to-Agent)**: Warrant-based inter-agent delegation

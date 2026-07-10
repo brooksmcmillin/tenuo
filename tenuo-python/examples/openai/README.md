@@ -5,8 +5,9 @@ Examples demonstrating Tenuo integration with OpenAI's API and Agents SDK.
 ## Quick Start
 
 ```bash
-# Install dependencies
-uv pip install tenuo openai
+# Install dependencies (the [openai] extra includes the openai and
+# openai-agents packages; agents_sdk.py requires openai-agents)
+uv pip install "tenuo[openai]"
 
 # Set API key
 export OPENAI_API_KEY="sk-..."
@@ -25,9 +26,9 @@ python agents_sdk.py    # Agents SDK integration
 Runtime guardrails without warrants. Shows:
 - `GuardBuilder` API for constraint definition
 - Constraint types: `Subpath`, `UrlSafe`, `Range`, etc.
-- Denial modes (block, monitor, audit)
+- Denial modes: `on_denial("raise")`, `"skip"`, or `"log"`
 - Streaming protection
-- Audit logging
+- Audit logging via `.audit(callback)`
 
 **Use when**: You want immediate protection without cryptographic overhead.
 
@@ -60,7 +61,7 @@ Using Tenuo with OpenAI's Agents SDK. Shows:
 - Agent + guardrail integration
 - Multi-turn conversations with protection
 
-**Use when**: Using OpenAI's Agents SDK (Swarm, etc.).
+**Use when**: Using the OpenAI Agents SDK.
 
 ## Security Constraints
 

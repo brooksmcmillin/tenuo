@@ -6,7 +6,13 @@ Examples demonstrating Tenuo integration with LangChain and LangGraph.
 
 ```bash
 # Install dependencies
-uv pip install tenuo langchain langchain-openai langchain-community langgraph
+uv pip install "tenuo[langchain]" langchain-openai langchain-community
+
+# For the LangGraph examples
+uv pip install "tenuo[langgraph]"
+
+# For the MCP examples
+uv pip install "tenuo[langgraph,mcp]"
 
 # Set API key
 export OPENAI_API_KEY="sk-..."
@@ -65,8 +71,8 @@ Complete integration of LangChain, MCP, and Tenuo. Shows:
 
 Advanced LangGraph integration with checkpointing. Shows:
 - Warrant serialization in state (base64 tokens, not objects)
-- Key binding at runtime (`KeyRegistry`)
-- `TenuoToolNode` for secure tool execution
+- Key binding at runtime (`from tenuo.keys import KeyRegistry`)
+- `from tenuo.langgraph import TenuoToolNode` for secure tool execution
 - State transition authorization
 - Memory persistence with `MemorySaver`
 
@@ -86,10 +92,12 @@ LangGraph agents calling MCP servers. Shows:
 
 | Pattern | Example | Use Case |
 |---------|---------|----------|
-| **Tool wrapping** | `@guard(warrant, tool="...")` | Protecting individual tools |
-| **Context propagation** | `warrant_scope(warrant)` | Thread-safe warrant passing |
-| **Third-party tools** | `guard(external_tool, ...)` | Securing tools you don't control |
+| **Tool wrapping** | `@guard(tool="...")` | Protecting individual tools |
+| **Context propagation** | `with warrant_scope(w), key_scope(k):` or `with warrant.bind(key):` | Thread-safe warrant passing |
+| **Third-party tools** | `guard([external_tool], bound)` | Securing tools you don't control |
 | **State serialization** | Store warrant tokens, not objects | LangGraph checkpointing |
+
+Note: `warrant_scope(warrant)` alone is not enough for Proof-of-Possession; pair it with `key_scope(key)`, or use `with bound:` where `bound = warrant.bind(key)`.
 
 ## Learn More
 

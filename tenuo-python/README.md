@@ -18,11 +18,11 @@ uv pip install "tenuo[google_adk]"    # + Google ADK
 uv pip install "tenuo[a2a]"           # + Agent-to-Agent (inter-agent delegation)
 uv pip install "tenuo[langchain]"     # + LangChain
 uv pip install "tenuo[langgraph]"     # + LangGraph (includes LangChain)
-uv pip install "tenuo[crewai]"        # + CrewAI
+uv pip install "tenuo[crewai]"        # + CrewAI (Python ≥3.10)
 uv pip install "tenuo[autogen]"       # + AutoGen AgentChat (Python ≥3.10)
 uv pip install "tenuo[fastapi]"       # + FastAPI
 uv pip install "tenuo[mcp]"           # + official MCP SDK, client/server (Python ≥3.10)
-uv pip install "tenuo[fastmcp]"       # + FastMCP (``TenuoMiddleware``, FastMCP servers)
+uv pip install "tenuo[fastmcp]"       # + FastMCP (``TenuoMiddleware``, FastMCP servers; Python ≥3.10)
 uv pip install "tenuo[temporal]"      # + Temporal Python SDK (workflow + activity authorization)
 uv pip install "tenuo[cloud]"         # optional: proprietary Tenuo Cloud client (see below)
 ```
@@ -34,7 +34,7 @@ uv pip install "tenuo[cloud]"         # optional: proprietary Tenuo Cloud client
 
 The open-source `tenuo` package implements the **protocol**: warrants, constraints, proof-of-possession, local enforcement, and framework hooks. It runs fully self-hosted with your own keys and authorizer. **No Cloud account required.**
 
-[**Tenuo Cloud**](https://cloud.tenuo.ai) is an **optional** managed control plane on top of that protocol (KMS, agent registry, warrant pipeline, signed revocation lists, signed receipts, discovery, human approvals, REST API). Any language can use Cloud via HTTP; the proprietary Python SDK is not required.
+[**Tenuo Cloud**](https://cloud.tenuo.ai) (currently in [early access](https://tenuo.ai/early-access.html)) is an **optional** managed control plane on top of that protocol (KMS, agent registry, warrant pipeline, signed revocation lists, signed receipts, discovery, human approvals, REST API). Any language can use Cloud via HTTP; the proprietary Python SDK is not required.
 
 | Path | Install | Details |
 |------|---------|---------|
@@ -44,7 +44,7 @@ The open-source `tenuo` package implements the **protocol**: warrants, constrain
 
 Combine extras as needed, e.g. `pip install "tenuo[cloud,temporal]"` or `"tenuo[cloud,langgraph]"`.
 
-For Python Cloud integration (credentials, `connect()` / `doctor()`, import swaps, approval gates), see the **[`tenuo-cloud` PyPI README](https://pypi.org/project/tenuo-cloud/)** and **[docs.tenuo.ai](https://docs.tenuo.ai)** — those guides are not part of this open-source repo.
+For Python Cloud integration (credentials, `connect()` / `doctor()`, import swaps, approval gates), see the **[`tenuo-cloud` PyPI README](https://pypi.org/project/tenuo-cloud/)** and **[docs.tenuo.ai](https://docs.tenuo.ai)**; those guides are not part of this open-source repo.
 
 **Claude Code** governance uses [`tenuo-claude-code`](https://pypi.org/project/tenuo-claude-code/) against the same Cloud tenant, not `tenuo-cloud`. See [Claude Code Governance](https://docs.tenuo.ai/guides/claude-code).
 
@@ -213,7 +213,7 @@ key = SigningKey.from_file("/run/secrets/tenuo-key")
 key = SigningKey.generate()
 ```
 
-### Key Management
+### Runtime Key Stores
 
 #### KeyRegistry (Thread-Safe Singleton)
 
@@ -293,7 +293,8 @@ bound = warrant.bind(keypair)
 from langchain_community.tools import DuckDuckGoSearchRun
 protected_tools = guard([DuckDuckGoSearchRun()], bound)
 
-# Use in agent
+# Use in agent (assumes an existing llm and prompt)
+from langchain.agents import create_openai_tools_agent
 agent = create_openai_tools_agent(llm, protected_tools, prompt)
 ```
 
@@ -309,6 +310,7 @@ def read_file(path: str) -> str:
     return open(path).read()
 
 # BoundWarrant as context manager - sets both warrant and key
+# (warrant and keypair continue from the LangChain example above)
 bound = warrant.bind(keypair)
 with bound:
     content = read_file("/tmp/test.txt")  # Authorized
@@ -324,7 +326,9 @@ with other_warrant.bind(keypair):
 Direct protection for OpenAI's Chat Completions and Responses APIs:
 
 ```python
-from tenuo.openai import GuardBuilder, Pattern, Subpath, UrlSafe, Shlex
+import openai
+from tenuo import Shlex
+from tenuo.openai import GuardBuilder, Pattern, Subpath, UrlSafe
 
 # Tier 1: Guardrails (quick hardening)
 client = (GuardBuilder(openai.OpenAI())
@@ -391,16 +395,16 @@ guard = (GuardBuilder()
     .allow("write_file", path=Subpath("/workspace"))
     .build())
 
-# Protect an entire crew
-protected_crew = guard.protect(crew)
-result = protected_crew.kickoff()
+# Register as a global before_tool_call hook: all crew tool calls are enforced
+guard.register()
+result = crew.kickoff()
 
-# Or use with Flows
-from tenuo.crewai import guarded_tool
+# Or use with Flows: guard individual steps
+from tenuo.crewai import guarded_step
 
-@guarded_tool(path=Subpath("/data"))
-def read_file(path: str) -> str:
-    return open(path).read()
+@guarded_step(allow={"read_file": {"path": Subpath("/data")}})
+def read_data(self):
+    ...
 ```
 
 For warrant-based delegation and per-agent constraints, see [CrewAI Integration](https://tenuo.ai/crewai).
@@ -413,6 +417,18 @@ Install dependencies:
 
 ```bash
 uv pip install "tenuo[autogen]" "python-dotenv"
+```
+
+```python
+from tenuo.autogen import GuardBuilder
+from tenuo import Subpath, UrlSafe
+
+guard = (GuardBuilder()
+    .allow("read_file", path=Subpath("/data"))
+    .allow("fetch_url", url=UrlSafe())
+    .build())
+
+protected_tools = guard.guard_tools([read_file, fetch_url])  # pass to your AgentChat agent
 ```
 
 Demos:
@@ -448,9 +464,10 @@ async def search_papers(query: str, sources: list[str]) -> list[dict]:
 client = A2AClient("https://research-agent.example.com")
 warrant = await client.request_warrant(signing_key=worker_key, capabilities={"search_papers": {}})
 result = await client.send_task(
-    skill="search_papers", 
+    "Find recent AI agents papers",   # message (required)
+    skill="search_papers",
     arguments={"query": "AI Agents"},
-    warrant=warrant, 
+    warrant=warrant,
     signing_key=worker_key
 )
 ```
@@ -486,6 +503,8 @@ worker = Worker(client, task_queue="my-queue", workflows=[MyWorkflow], activitie
 Every activity invocation is verified against the workflow's warrant + PoP signature; deterministic replay is preserved. See [Temporal Integration](https://tenuo.ai/temporal) for the full guide.
 
 ## LangGraph Integration
+
+Assumes an existing `StateGraph` named `graph`:
 
 ```python
 from tenuo import KeyRegistry
@@ -535,6 +554,8 @@ Tenuo logs all authorization events as JSON for observability:
 To suppress logs (for testing/demos):
 
 ```python
+from tenuo import configure
+
 configure(issuer_key=key, dev_mode=True, audit_log=False)
 ```
 
@@ -574,9 +595,9 @@ diagnose(warrant)
 warrant.ttl_remaining  # timedelta
 warrant.ttl            # alias for ttl_remaining
 
-# Status
-warrant.is_expired     # bool
-warrant.is_terminal    # bool (can't delegate further)
+# Status (properties; method forms is_expired() / is_terminal() also exist)
+warrant.expired        # bool
+warrant.terminal       # bool (can't delegate further)
 
 # Human-readable
 warrant.capabilities   # dict of tool -> constraints
@@ -589,6 +610,7 @@ _(Requires Python ≥3.10)_
 **Client**: connect to any MCP server with automatic warrant injection:
 
 ```python
+from tenuo import mint, Capability, Subpath
 from tenuo.mcp import SecureMCPClient
 
 # Stdio (local subprocess)
@@ -611,8 +633,10 @@ async with SecureMCPClient(
 from tenuo import Authorizer, PublicKey, CompiledMcpConfig, McpConfig
 from tenuo.mcp import MCPVerifier
 
+root_pubkey = PublicKey.from_env("TENUO_ROOT_PUBKEY")  # control plane's public key
+
 verifier = MCPVerifier(
-    authorizer=Authorizer(trusted_roots=[PublicKey.from_bytes(root_pub)]),
+    authorizer=Authorizer(trusted_roots=[root_pubkey]),
     config=CompiledMcpConfig.compile(McpConfig.from_file("mcp-config.yaml")),
 )
 
@@ -673,7 +697,7 @@ Authorization errors are opaque by default:
 
 ### Closed-World Constraints
 
-Once you add **any** constraint, unknown arguments are rejected:
+Once you add **any** constraint, unknown arguments are rejected. Inside a `Warrant.mint_builder()` chain:
 
 ```python
 # 'timeout' is unknown - blocked by closed-world policy
@@ -702,6 +726,14 @@ python examples/langchain/langgraph_protected.py
 python examples/mcp/mcp_client_demo.py
 ```
 
+## Requirements
+
+| Component | Supported |
+|-----------|-----------|
+| **Python** | 3.9 - 3.14 (some extras require ≥3.10, see Installation) |
+| **OS** | Linux, macOS, Windows |
+| **Rust** | Not required (binary wheels for macOS, Linux, Windows) |
+
 ## Documentation
 
 - **[Quickstart](https://tenuo.ai/quickstart)** - Get running in 5 minutes
@@ -713,6 +745,7 @@ python examples/mcp/mcp_client_demo.py
 - **[LangChain](https://tenuo.ai/langchain)** - Tool protection
 - **[LangGraph](https://tenuo.ai/langgraph)** - Multi-agent security
 - **[CrewAI](https://tenuo.ai/crewai)** - Multi-agent crew protection
+- **[MCP](https://tenuo.ai/mcp)** - Model Context Protocol client + server verification
 - **[Temporal](https://tenuo.ai/temporal)** - Workflow + activity authorization (replay-safe)
 - **[Security](https://tenuo.ai/security)** - Threat model, best practices
 - **[Tenuo Cloud](https://docs.tenuo.ai)** - Optional managed control plane (API + proprietary [`tenuo-cloud`](https://pypi.org/project/tenuo-cloud/) SDK)

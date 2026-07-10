@@ -4,6 +4,8 @@
 
 Define **who must approve**, **how many**, and **which calls** in the warrant. Collect `SignedApproval` signatures and retry. There is no unsigned path.
 
+Examples on this page use the explicit low-level API (`Warrant.mint_builder()`, `enforce_tool_call`) rather than the `mint_sync`/`guard` helpers from the README quick start. The concepts are the same: gates and approvers are fields on the warrant, and the framework adapters below enforce them identically.
+
 ---
 
 ## Quick Start
@@ -15,7 +17,7 @@ control_key = SigningKey.generate()
 agent_key = SigningKey.generate()
 approver_key = SigningKey.generate()
 
-# 1. Warrant — capabilities, gates, approvers, threshold
+# 1. Warrant: capabilities, gates, approvers, threshold
 warrant = (Warrant.mint_builder()
     .capability("transfer")
     .approval_gates({"transfer": None})       # this tool needs approval
@@ -26,7 +28,7 @@ warrant = (Warrant.mint_builder()
     .mint(control_key)
 )
 
-# 2. Enforce — handler prompts and signs on gate fire
+# 2. Enforce: handler prompts and signs on gate fire
 result = enforce_tool_call(
     tool_name="transfer",
     tool_args={"amount": 50_000, "to": "alice"},
@@ -120,9 +122,9 @@ Each `SignedApproval` is CBOR bytes. Adapters differ in how they wrap the list:
 
 | Integration | Where | Encoding |
 |-------------|-------|----------|
-| **MCP** | `params._meta.tenuo.approvals` | JSON array of **base64(CBOR)** strings — no outer wrapper |
+| **MCP** | `params._meta.tenuo.approvals` | JSON array of **base64(CBOR)** strings, no outer wrapper |
 | **FastAPI / A2A** | `X-Tenuo-Approvals` header (A2A also accepts `x-tenuo-approvals` param) | **base64(JSON array of base64(CBOR) strings)** |
-| **Temporal** | `x-tenuo-approvals` activity header | **JSON array of base64(CBOR) strings** — no outer base64 wrapper |
+| **Temporal** | `x-tenuo-approvals` activity header | **JSON array of base64(CBOR) strings**, no outer base64 wrapper |
 
 ```python
 import base64, json
@@ -130,10 +132,10 @@ from tenuo.approval import sign_approval
 
 signed = sign_approval(request, approver_key)
 
-# MCP / Temporal — array of base64 CBOR blobs
+# MCP / Temporal: array of base64 CBOR blobs
 approvals_wire = [base64.b64encode(signed.to_bytes()).decode("ascii")]
 
-# FastAPI / A2A — outer base64 JSON wrapper
+# FastAPI / A2A: outer base64 JSON wrapper
 header_value = base64.b64encode(json.dumps(approvals_wire).encode()).decode()
 ```
 
@@ -151,7 +153,7 @@ See integration guides: [MCP](mcp.md#approval-gates), [FastAPI](fastapi.md#heade
 | **A2A** | JSON-RPC **-32019** + `request_hash` | JSON-RPC **-32020** + `required` / `received` | `X-Tenuo-Approvals` header or `x-tenuo-approvals` param |
 | **Temporal** | `ApplicationError.type == "approval_required"` | `ApplicationError.type == "insufficient_approvals"` | `x-tenuo-approvals` header or `set_activity_approvals()` |
 
-Scope denials use different codes — see each integration guide.
+Scope denials use different codes; see each integration guide.
 
 **Field names:** Python `.details` use `required` / `received`. HTTP and MCP retry payloads use `got` / `need`. A2A error `data` uses `required` / `received`.
 
@@ -214,9 +216,9 @@ plugin = TenuoTemporalPlugin(
 
 | Handler | Use Case |
 |---------|----------|
-| `cli_prompt(approver_key=key)` | Local dev — terminal prompt |
-| `auto_approve(approver_key=key)` | Tests — signs automatically |
-| `auto_deny(reason=...)` | Dry-run — always raises |
+| `cli_prompt(approver_key=key)` | Local dev - terminal prompt |
+| `auto_approve(approver_key=key)` | Tests - signs automatically |
+| `auto_deny(reason=...)` | Dry-run - always raises |
 
 All signing handlers require the approver's `SigningKey` (held by the human or approval service, not the agent).
 
@@ -235,6 +237,8 @@ def slack_approval(request):
 ```
 
 Async handlers are supported.
+
+> **Tenuo Cloud** provides managed approval routing (approvals delivered to Slack and mobile, with SSO-backed approver identity) so you don't have to build and operate custom handlers. Cloud customers: see the [Cloud approvals API reference](https://docs.tenuo.ai/api-reference/approvals) (sign-in required). Not a customer yet? [Request early access](https://tenuo.ai/early-access.html).
 
 ---
 
@@ -264,7 +268,8 @@ Every approval binds to `(warrant_id, tool, args, holder)` via SHA-256 (`compute
 
 ## See Also
 
-- [Enforcement Architecture](enforcement.md#human-approvals) — Where approvals sit in the pipeline
-- [MCP Approval Gates](mcp.md#approval-gates) — Remote PEP retry flow
-- [FastAPI](fastapi.md#error-handling) — HTTP 409 approval responses
-- [Wire format §16](spec/wire-format-v1.md#16-approval-wire-format-multi-sig) — `SignedApproval` bytes
+- [Enforcement Architecture](enforcement.md#human-approvals) - Where approvals sit in the pipeline
+- [MCP Approval Gates](mcp.md#approval-gates) - Remote PEP retry flow
+- [FastAPI](fastapi.md#error-handling) - HTTP 409 approval responses
+- [Wire format §16](spec/wire-format-v1.md#16-approval-wire-format-multi-sig) - `SignedApproval` bytes
+- [Cloud approvals API reference](https://docs.tenuo.ai/api-reference/approvals) - Managed approval routing for Tenuo Cloud customers (sign-in required)
