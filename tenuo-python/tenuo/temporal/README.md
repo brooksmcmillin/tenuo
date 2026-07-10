@@ -1,4 +1,4 @@
-# `tenuo.temporal` — authorization layer for Temporal Python SDK
+# `tenuo.temporal`: authorization layer for Temporal Python SDK
 
 This package interposes as a Temporal `WorkerInterceptor` (and, when the plugin is used, a `SimplePlugin`) to:
 
@@ -12,7 +12,7 @@ Activity definitions require no changes. Authorization is transparent to user wo
 
 | Entry point | Use when |
 |---|---|
-| `tenuo.temporal_plugin.TenuoTemporalPlugin` | **Recommended.** Full plugin: wires the worker interceptor, the client interceptor, the sandboxed workflow runner, and the required internal activity registration in one step. Pass to `Client.connect(..., plugins=[...])`. |
+| `tenuo.temporal_plugin.TenuoTemporalPlugin` | **Recommended.** Full plugin: wires the worker interceptor, the client interceptor, the sandboxed workflow runner, and the required internal activity registration in one step. Pass to `Client.connect(..., plugins=[...])`. The supported public import is `from tenuo.temporal import TenuoTemporalPlugin` (re-exported lazily by `tenuo/temporal/__init__.py`). |
 | `tenuo.temporal.TenuoWorkerInterceptor` | Manual setup when you need custom `SandboxedWorkflowRunner` / `workflow_runner` / worker wiring. Callers must also register `*TENUO_TEMPORAL_ACTIVITIES` and call `register_worker_config(task_queue, config)` before `Worker(...)`. |
 
 ## File map
@@ -23,7 +23,7 @@ Activity definitions require no changes. Authorization is transparent to user wo
 | `_workflow.py` | User-facing helpers (`execute_workflow_authorized`, `AuthorizedWorkflow`, `tenuo_execute_activity`, `tenuo_execute_child_workflow`, `workflow_grant`, `set_activity_approvals`, `tenuo_continue_as_new`), and the `_tenuo_internal_mint_activity` that delegations dispatch into. |
 | `_client.py` | Client-side header injection, keyed by `workflow_id`, via `TenuoClientInterceptor` and `execute_workflow_authorized`. |
 | `_headers.py` | Serialize / extract warrant bytes across the Temporal header boundary (raw CBOR, optional gzip). |
-| `_config.py` | `TenuoPluginConfig` — the single configuration surface. |
+| `_config.py` | `TenuoPluginConfig`: the single configuration surface. |
 | `_state.py` | `run_id`-keyed workflow header store; `task_queue`-scoped worker-config registry. |
 | `_pop.py` | PoP argument-name normalization (positional → named, `**kwargs` resolution). |
 | `_dedup.py` | `PopDedupStore` protocol + `InMemoryPopDedupStore`. |
@@ -47,15 +47,15 @@ These are non-obvious from the code alone; each has a corresponding test guard c
 
 ## Tests
 
-- `tenuo-python/tests/e2e/test_temporal_e2e.py` — mocked end-to-end activity-inbound and workflow-outbound flows.
-- `tenuo-python/tests/e2e/test_temporal_live.py` — same paths against a real in-process `WorkflowEnvironment.start_local()`.
-- `tenuo-python/tests/e2e/test_temporal_examples_smoke.py` — loads each `examples/temporal/*.py` script and runs `main()` against `WorkflowEnvironment` (redirecting `Client.connect` away from `localhost:7233`).
-- `tenuo-python/tests/e2e/test_temporal_replay.py` — record-and-replay determinism, including denial, trusted-root rotation, and PoP time-window clock-boundary crossing via `start_time_skipping()`.
-- `tenuo-python/tests/adapters/test_temporal.py` — per-helper unit and regression tests.
-- `tenuo-python/tests/adapters/test_temporal_plugin.py` — `SimplePlugin` contract coverage.
-- `tenuo-python/tests/adapters/test_tenant_isolation.py` — `run_id` keying and `task_queue` routing invariants.
-- `tenuo-python/tests/property/test_temporal_props.py` — Hypothesis-based wire-format and error-wrapping invariants.
-- `tenuo-python/tests/unit/test_temporal_normalize_pop_args.py` — PoP argument normalization.
+- `tenuo-python/tests/e2e/test_temporal_e2e.py` - mocked end-to-end activity-inbound and workflow-outbound flows.
+- `tenuo-python/tests/e2e/test_temporal_live.py` - same paths against a real in-process `WorkflowEnvironment.start_local()`.
+- `tenuo-python/tests/e2e/test_temporal_examples_smoke.py` - loads each `examples/temporal/*.py` script and runs `main()` against `WorkflowEnvironment` (redirecting `Client.connect` away from `localhost:7233`).
+- `tenuo-python/tests/e2e/test_temporal_replay.py` - record-and-replay determinism, including denial, trusted-root rotation, and PoP time-window clock-boundary crossing via `start_time_skipping()`.
+- `tenuo-python/tests/adapters/test_temporal.py` - per-helper unit and regression tests.
+- `tenuo-python/tests/adapters/test_temporal_plugin.py` - `SimplePlugin` contract coverage.
+- `tenuo-python/tests/adapters/test_tenant_isolation.py` - `run_id` keying and `task_queue` routing invariants.
+- `tenuo-python/tests/property/test_temporal_props.py` - Hypothesis-based wire-format and error-wrapping invariants.
+- `tenuo-python/tests/unit/test_temporal_normalize_pop_args.py` - PoP argument normalization.
 
 The live and replay suites run in a dedicated `temporal-integration` CI job.
 
@@ -63,7 +63,7 @@ The live and replay suites run in a dedicated `temporal-integration` CI job.
 
 ## Further documentation
 
-- [`docs/temporal.md`](../../../docs/temporal.md) — getting-started guide (prerequisites, minimal example, conceptual model).
-- [`docs/temporal-reference.md`](../../../docs/temporal-reference.md) — production reference (key management, rotation, dedup stores, approval gates, troubleshooting).
-- [`tenuo-python/examples/temporal/`](../../examples/temporal/) — runnable examples (single-warrant, multi-warrant, delegation, Cloud IAM layering, MCP layering).
-- [`CHANGELOG.md`](../../../CHANGELOG.md) — notable behavior changes per release.
+- [`docs/temporal.md`](../../../docs/temporal.md) - getting-started guide (prerequisites, minimal example, conceptual model).
+- [`docs/temporal-reference.md`](../../../docs/temporal-reference.md) - production reference (key management, rotation, dedup stores, approval gates, troubleshooting).
+- [`tenuo-python/examples/temporal/`](../../examples/temporal/) - runnable examples (single-warrant, multi-warrant, delegation, Cloud IAM layering, MCP layering).
+- [`CHANGELOG.md`](../../../CHANGELOG.md) - notable behavior changes per release.

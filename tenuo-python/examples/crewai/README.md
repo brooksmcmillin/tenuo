@@ -2,7 +2,15 @@
 
 **These demos show where prompt-based guardrails fail and capability-based authorization holds.**
 
-This directory contains integration examples and security demos for Tenuo's CrewAI integration using the native hooks API (v2.0).
+This directory contains integration examples and security demos for Tenuo's CrewAI integration using the native hooks API (the adapter's v2 hooks-based design, not the tenuo package version).
+
+## Installation
+
+```bash
+uv pip install "tenuo[crewai]"
+```
+
+The CrewAI integration requires Python >= 3.10.
 
 ## Integration Examples
 
@@ -38,7 +46,7 @@ python hierarchical_delegation.py
 - Escalation prevention
 - Hooks-based authorization at the framework level
 
-### guarded_crew.py (146 lines)
+### guarded_crew.py
 
 Policy-based protection for entire crews using `GuardedCrew`.
 
@@ -53,7 +61,7 @@ python guarded_crew.py
 - Audit logging for all authorization decisions
 - Fail-closed behavior with `on_denial("raise")`
 
-### guarded_flow.py (41 lines)
+### guarded_flow.py
 
 Step-level protection for CrewAI Flows using `@guarded_step` decorator.
 
@@ -73,7 +81,7 @@ python guarded_flow.py
 
 See Tenuo in action preventing real attacks:
 
-### demo_simple.py (216 lines)
+### demo_simple.py
 
 Deterministic demo showing prompt injection defense and delegation attenuation.
 
@@ -97,7 +105,7 @@ python demo_simple.py --slow       # Slower pacing for presentations
 - Researcher attempts to widen scope via delegation
 - Cryptographic enforcement prevents escalation
 
-### demo_live.py (201 lines)
+### demo_live.py
 
 Real LLM demo with CrewAI agent and indirect injection attack.
 
@@ -116,7 +124,7 @@ python demo_live.py --quiet      # Less verbose output
 
 **Note:** LLM behavior varies. Use `demo_simple.py` for guaranteed demonstration.
 
-### research_team_demo.py (939 lines)
+### research_team_demo.py
 
 Comprehensive demo with multiple attack vectors and multi-agent delegation.
 
@@ -142,9 +150,20 @@ python research_team_demo.py --attacks  # Show all attack scenarios
 ## Quick Start
 
 ```python
+from crewai import Agent, Task, Crew, Tool
 from tenuo.crewai import GuardBuilder, Subpath
 
-# Create guard with constraints
+# Define a tool
+read_file_tool = Tool(
+    name="read_file",
+    description="Read a file",
+    func=lambda path: f"Contents of: {path}",
+)
+
+# Create guard with constraints.
+# Note: constraints are closed-world. Once a tool has any constraint,
+# every argument must be listed in .allow(); an unlisted argument
+# triggers a denial (UnlistedArgument). Use Wildcard() to exempt an argument.
 guard = (GuardBuilder()
     .allow("read_file", path=Subpath("/data"))
     .on_denial("raise")
@@ -156,10 +175,18 @@ guard.register()
 # Use tools directly - hooks intercept all calls
 agent = Agent(
     role="Researcher",
+    goal="Read research data",
     tools=[read_file_tool],  # No wrapping needed
 )
 
+task = Task(
+    description="Summarize /data/report.txt",
+    expected_output="A short summary",
+    agent=agent,
+)
+
 # Run crew
+crew = Crew(agents=[agent], tasks=[task])
 crew.kickoff()
 
 # Cleanup
@@ -177,5 +204,5 @@ The warrant is the source of truth, not the prompt.
 
 ## See Also
 
-- [Full CrewAI Documentation](../../docs/crewai.md)
-- [API Reference](../../docs/api.md)
+- [Full CrewAI Documentation](../../../docs/crewai.md)
+- [API Reference](../../../docs/api-reference.md)

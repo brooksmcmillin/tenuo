@@ -2,6 +2,8 @@
 
 A multi-agent security incident response system demonstrating Tenuo's warrant-based authorization for Google ADK agents.
 
+> **Note:** This is a guard-level demo. Google ADK is optional: the script falls back to a mock `ToolContext` when ADK is not installed (see the `GOOGLE_ADK_AVAILABLE` guard in `demo.py`), and authorization is fully functional without any API keys.
+
 ## Scenario
 
 Three agents work together to respond to a security incident:
@@ -16,21 +18,17 @@ Each agent operates with cryptographically-enforced capabilities using Tenuo war
 
 - ✅ **Tier 2 Authorization** - Warrants with Proof-of-Possession (PoP) signatures
 - ✅ **Monotonic Attenuation** - Capabilities only narrow, never expand
-- ✅ **Session Isolation** - ScopedWarrant prevents cross-agent warrant leakage
 - ✅ **Attack Resistance** - Demonstrates security against privilege escalation
 
 ## Installation
 
 ```bash
-# Install Google ADK
-uv pip install google-genai
-
-# Install Tenuo
-uv pip install tenuo
+# Install Tenuo with the Google ADK extra
+uv pip install "tenuo[google_adk]"
 
 # Or install from the repository
 cd tenuo-python
-uv pip install -e ".[google-adk]"
+uv pip install -e ".[google_adk]"
 ```
 
 ## Usage
@@ -39,14 +37,6 @@ uv pip install -e ".[google-adk]"
 # Normal mode (simulation - guards are fully functional)
 python demo.py
 
-# Use real Gemini models
-export GOOGLE_API_KEY=your_key_here
-python demo.py --real-llm
-
-# Use OpenAI models instead
-export OPENAI_API_KEY=your_key_here
-python demo.py --use-openai
-
 # Presentation mode (with delays between steps)
 python demo.py --slow
 
@@ -54,7 +44,7 @@ python demo.py --slow
 python demo.py --no-attacks
 ```
 
-**Note**: The demo works in simulation mode without any API keys. Simulation mode still uses real Tenuo guards - authorization is fully functional, only the LLM responses are simulated.
+**Note**: The demo runs in simulation mode and needs no API keys. Simulation mode still uses real Tenuo guards - authorization is fully functional, only the LLM responses are simulated.
 
 ## Demo Flow
 
@@ -62,7 +52,7 @@ python demo.py --no-attacks
 - Creates warrant hierarchy with orchestrator as root authority
 - Issues warrants to each agent with least privilege
 - Detector: read_logs only
-- Analyst: read_logs + query_threat_db
+- Analyst: read_logs + query_threat_db + block_ip (so it can delegate block_ip to the Responder)
 - Responder: block_ip + quarantine_user
 
 ### Phase 2: Detection
@@ -108,7 +98,7 @@ python demo.py --no-attacks
 ✓ Analyst warrant issued
     ✓ read_logs (path: /var/log)
     ✓ query_threat_db (tables: threats, users)
-    ✗ block_ip
+    ✓ block_ip (can delegate to Responder)
 
 ✓ Responder warrant issued
     ✓ block_ip (any IP)
@@ -152,22 +142,22 @@ python demo.py --no-attacks
     signature: verified ✓
 
 ======================================================================
-     ATTACK SCENARIOS (Demonstrating Security)
+     ATTACK SCENARIOS (Real Authorization Attempts)
 ======================================================================
 
 ▶ Attack 1: Detector tries to block IP directly
 
 [DETECTOR] Attempting: block_ip(ip='203.0.113.5')...
-✗ BLOCKED: ToolAuthorizationError
+✗ BLOCKED: authorization_denied
     Reason: Tool 'block_ip' not authorized in warrant
     Warrant only grants: read_logs
 ✓ Security boundary enforced ✓
 
-▶ Attack 2: Analyst tries to block entire subnet
+▶ Attack 2: Responder tries to block entire subnet
 
-[ANALYST] Attempting: block_ip(ip='203.0.0.0/8')...
-✗ BLOCKED: ConstraintViolation
-    Reason: IP '203.0.0.0/8' violates Cidr constraint
+[RESPONDER] Attempting: block_ip(ip='203.0.0.0/8')...
+✗ BLOCKED: authorization_denied
+    Reason: IP '203.0.0.0/8' violates constraint Exact('203.0.113.5')
     Allowed: 203.0.113.5 only (attenuated from parent)
 ✓ Monotonic attenuation enforced ✓
 
@@ -191,19 +181,18 @@ After running this demo, you should understand:
 
 1. **Why Tier 2 matters** - Cryptographic proof prevents warrant forgery
 2. **Monotonic attenuation** - Delegated warrants can only narrow scope
-3. **Session isolation** - ScopedWarrant prevents cross-agent attacks
-4. **Least privilege** - Each agent has exactly the capabilities it needs
-5. **Audit trail** - Every action is cryptographically linked to authorizing warrant
+3. **Least privilege** - Each agent has exactly the capabilities it needs
+4. **Audit trail** - Every action is cryptographically linked to authorizing warrant
 
 ## Next Steps
 
 - Explore `tenuo/google_adk/` for the full integration API
-- See `docs/google-adk.md` for complete documentation
+- See [docs/google-adk.md](../../../docs/google-adk.md) for complete documentation
 - Try modifying warrant capabilities to see what gets blocked
 - Extend the demo with additional agents or attack scenarios
 
 ## See Also
 
 - [Google ADK Documentation](https://github.com/google/adk-toolkit)
-- [Tenuo Security Model](../../docs/security.md)
-- [Constraint Types](../../docs/constraints.md)
+- [Tenuo Security Model](../../../docs/security.md)
+- [Constraint Types](../../../docs/constraints.md)

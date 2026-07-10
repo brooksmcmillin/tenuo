@@ -199,6 +199,8 @@ Server-side warrant verification using `MCPVerifier`.
 - Mixed deployment (`require_warrant=False`) with the same middleware pattern
 - `verify_mcp_call` standalone convenience function (raw JSON-RPC handlers)
 
+On approval retries, approvals travel in `params._meta.tenuo.approvals` as a JSON array of base64(CBOR) `SignedApproval` strings; see [docs/approvals.md](../../../docs/approvals.md) and [docs/mcp.md](../../../docs/mcp.md) for the wire format.
+
 ---
 
 ### 9. [`mcp_research_server.py`](mcp_research_server.py) - Research Agent Server
@@ -267,23 +269,30 @@ async with SecureMCPClient(
     ...
 ```
 
-### Pattern 1b: MCPVerifier (Server-Side)
+### Pattern 1b: MCPVerifier + TenuoMiddleware (Server-Side)
 
-Verify warrants inside MCP tool handlers.
+Verify warrants on a FastMCP server with `TenuoMiddleware`. FastMCP does not pass `params._meta` into tool handlers, so calling the verifier inside a handler fails with "No warrant provided"; register the middleware instead and keep handlers slim (see [docs/mcp.md](../../../docs/mcp.md)).
 
 ```python
+import os
+
+from fastmcp import FastMCP
 from tenuo import Authorizer, PublicKey, CompiledMcpConfig, McpConfig
-from tenuo.mcp import MCPVerifier
+from tenuo.mcp import MCPVerifier, TenuoMiddleware
+
+root_pub = bytes.fromhex(os.environ["TENUO_ISSUER_PUB"])
 
 verifier = MCPVerifier(
     authorizer=Authorizer(trusted_roots=[PublicKey.from_bytes(root_pub)]),
     config=CompiledMcpConfig.compile(McpConfig.from_file("mcp-config.yaml")),
 )
 
+mcp = FastMCP("my-server", middleware=[TenuoMiddleware(verifier)])
+
 @mcp.tool()
-async def read_file(path: str, **kwargs) -> str:
-    clean = verifier.verify_or_raise("read_file", {"path": path, **kwargs})
-    return open(clean["path"]).read()
+async def read_file(path: str) -> str:
+    # TenuoMiddleware has already verified the warrant before this runs
+    return open(path).read()
 ```
 
 ### Pattern 2: LangChain Integration
@@ -296,24 +305,31 @@ from langchain.agents import AgentExecutor, create_react_agent
 
 async with SecureMCPClient(...) as client:
     # Convert to LangChain tools
-    mcp_tools = await client.get_tools()
-    langchain_tools = [MCPToolAdapter(tool, client) for tool in mcp_tools]
+    adapter = MCPToolAdapter(client)
+    langchain_tools = await adapter.to_langchain_tools()
 
     # Use in agent
     agent = create_react_agent(llm, langchain_tools, prompt)
     executor = AgentExecutor(agent=agent, tools=langchain_tools)
 ```
 
+Note: the `create_react_agent` import path varies by LangChain version (older versions use `langchain.agents`, newer setups use `langgraph.prebuilt`). See [`langchain_mcp_demo.py`](langchain_mcp_demo.py) for the canonical working example.
+
 ### Pattern 3: A2A Delegation
 
 MCP tools exposed through A2A protocol for multi-agent systems.
 
 ```python
-from tenuo.a2a import A2AServer
+from tenuo.a2a import A2AServerBuilder
 from tenuo.mcp import SecureMCPClient
 
 # Worker agent exposes MCP tools via A2A
-server = A2AServer(...)
+server = (A2AServerBuilder()
+    .name("Worker Agent")
+    .url("http://localhost:8000")
+    .key(worker_key)
+    .accept_warrants_from(orchestrator_key.public_key)
+    .build())
 
 @server.skill("search_files")
 async def search_files(path: str, pattern: str):
@@ -429,6 +445,8 @@ Requires Python 3.10+ (MCP SDK requirement).
 
 **Fix:** Ensure warrant capability name matches MCP tool name:
 ```python
+from tenuo import Warrant
+
 # MCP tool: "read_file"
 warrant = Warrant.mint_builder().capability("read_file", ...).mint(key)
 ```
@@ -439,6 +457,9 @@ warrant = Warrant.mint_builder().capability("read_file", ...).mint(key)
 
 **Debug:** Check MCP config extraction:
 ```python
+from tenuo import CompiledMcpConfig, McpConfig
+
+compiled = CompiledMcpConfig.compile(McpConfig.from_file("mcp-config.yaml"))
 result = compiled.extract_constraints("read_file", arguments)
 print(result.constraints)  # Shows extracted values
 ```
@@ -458,7 +479,8 @@ print(result.constraints)  # Shows extracted values
 
 **Fix:** Use `MCPToolAdapter`:
 ```python
-langchain_tools = [MCPToolAdapter(tool, client) for tool in mcp_tools]
+adapter = MCPToolAdapter(client)
+langchain_tools = await adapter.to_langchain_tools()
 ```
 
 ---

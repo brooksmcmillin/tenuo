@@ -98,8 +98,8 @@ Content creation crew with warrant-based A2A delegation.
 
 **Run:**
 ```bash
-# Install CrewAI first
-uv pip install crewai
+# Install dependencies
+uv pip install "tenuo[a2a]" crewai
 
 # Run demo
 python crewai_delegation.py
@@ -186,6 +186,10 @@ from tenuo.a2a import A2AClient
 from tenuo.constraints import UrlSafe
 
 async def delegate_task(my_warrant, my_key):
+    # Worker's public key, from its agent card
+    # (GET /.well-known/agent.json) or your service registry
+    worker_public_key = ...
+
     # Attenuate warrant for this specific task
     task_warrant = my_warrant.attenuate(
         signing_key=my_key,
@@ -198,6 +202,7 @@ async def delegate_task(my_warrant, my_key):
 
     client = A2AClient("https://worker.example.com")
     return await client.send_task(
+        "Search for papers on AI safety",
         warrant=task_warrant,
         skill="search",
         arguments={"query": "papers on AI safety", "url": "https://arxiv.org"},
@@ -261,12 +266,15 @@ task_warrant = (Warrant.mint_builder()
 # Call worker
 client = A2AClient("http://localhost:8000")
 result = await client.send_task(
+    "Search for AI safety papers",
     warrant=task_warrant,
     skill="search",
     arguments={"query": "AI safety", "url": "https://arxiv.org"},
     signing_key=orchestrator_key,
 )
 ```
+
+Note: `signing_key=` produces the Proof-of-Possession (PoP) signature, which the server requires by default (`require_pop=True`).
 
 ---
 
@@ -294,7 +302,7 @@ These examples build on each other:
 - **OpenAI Swarm + A2A**: Swarm framework with warrant delegation
 - **Performance benchmark**: Latency and throughput measurements
 
-**Want to contribute?** See [CONTRIBUTING.md](../../CONTRIBUTING.md)
+**Want to contribute?** See [CONTRIBUTING.md](../../../CONTRIBUTING.md)
 
 ---
 
@@ -323,6 +331,8 @@ See [`examples/temporal/`](../temporal/) for durable workflow patterns:
 - **[Constraints Reference](../../../docs/constraints.md)** - Available constraint types
 - **[Security Model](../../../docs/security.md)** - Threat model and mitigations
 
+For approval-gated skills, see the [Human Approval section of docs/a2a.md](../../../docs/a2a.md#human-approval) and [docs/approvals.md](../../../docs/approvals.md): A2A signals approvals via JSON-RPC error -32019 (approval_required) and -32020 (insufficient_approvals).
+
 ---
 
 ## Testing Your A2A Server
@@ -336,14 +346,18 @@ curl http://localhost:8000/.well-known/agent.json
 
 ### Send Task (with curl)
 
+Note: `A2AServer` requires a Proof-of-Possession signature by default (`require_pop=True`), so a warrant header alone is rejected. Either send the PoP in an `X-Tenuo-PoP` header (computed over the request, as `A2AClient` does with `signing_key=`), or build the server with `.require_pop(False)` for local testing only.
+
 ```bash
 # Create warrant (use tenuo CLI or Python)
-WARRANT="..."  # Base64-encoded JWT
+WARRANT="..."  # Base64-encoded CBOR warrant (from warrant.to_base64())
+POP="..."      # Base64-encoded PoP signature
 
 # Send task
 curl -X POST http://localhost:8000/a2a \
   -H "Content-Type: application/json" \
   -H "X-Tenuo-Warrant: $WARRANT" \
+  -H "X-Tenuo-PoP: $POP" \
   -d '{
     "jsonrpc": "2.0",
     "method": "task/send",
@@ -365,14 +379,23 @@ curl -X POST http://localhost:8000/a2a \
 
 ### Q: "Skill not found in warrant"
 
-**Problem:** Tool name doesn't match warrant skill name.
+**Problem:** The `skill=` name in `send_task` doesn't match the warrant capability name.
 
-**Fix:** Use skill mapping:
+**Fix:** Make the skill name, the warrant capability, and the server's skill id all match:
 ```python
-guard = (GuardBuilder()
-    .with_warrant(warrant, key)
-    .map_skill("search_tool", "search")  # tool_name -> skill_name
-    .build())
+from tenuo import Warrant
+
+# Warrant capability, @server.skill(...) id, and skill= must agree
+task_warrant = (Warrant.mint_builder()
+    .capability("search", ...)  # same name as @server.skill("search")
+    .mint(key))
+
+result = await client.send_task(
+    "Search for papers",
+    warrant=task_warrant,
+    skill="search",  # matches the capability above
+    arguments={"query": "AI safety"},
+)
 ```
 
 ### Q: "Constraint violation" but warrant looks correct
