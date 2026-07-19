@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **IETF Draft**: Published `draft-niyikiza-oauth-attenuating-agent-tokens-01`.
+- **Distinct missing-tool denial category.** Requests for tools outside a
+  warrant's capabilities now surface as `tool_not_allowed` instead of
+  `constraint_violation` in authorizer audit events and Python enforcement.
+  MCP responses identify these as tool-authorization failures while argument
+  constraint failures retain their existing category and detail.
 
 ## [0.2.3] - 2026-07-02
 
